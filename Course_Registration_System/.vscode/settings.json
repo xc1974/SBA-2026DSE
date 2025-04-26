@@ -1,0 +1,12 @@
+{
+    "C_Cpp.errorSquiggles": "enabled",
+    "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools",
+    "files.associations": {
+        "iosfwd": "cpp",
+        "map": "cpp",
+        "xstring": "cpp",
+        "iostream": "cpp"
+    },
+    "C_Cpp.default.compilerPath": "D:\\software\\LLVM\\bin\\clang++.exe",
+    
+}
