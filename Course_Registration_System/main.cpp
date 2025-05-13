@@ -1,7 +1,7 @@
 #include <iostream>
 #include <string>
 #include <sstream>
-#include <iomanip>      // std::setprecision
+#include <iomanip> 
 #include <math.h>
 #include <map>
 #include <set>
@@ -36,12 +36,13 @@ void account_find(string account) {
 }
 
 bool pass_check(string student_acc, string password) {
-    ifstream student("student.txt");  // Open the file
-    string fileID, filePassword;
-    
-    while (student >> fileID >> filePassword) {
+    ifstream student("student.txt");
+    string fileID, filePassword, fileusername;
+    // Check student accounts
+    while (student >> fileID >> filePassword >> fileusername) {
         if (fileID == student_acc) { 
             if (filePassword == password) {
+                studentName = fileusername;
                 student.close();
                 return true;
             } else {
@@ -50,23 +51,26 @@ bool pass_check(string student_acc, string password) {
             }
         }
     }
-    student.close();
-    admin_mode = false;
-    ifstream admin("admin.txt");
-    string fileID, filepassword;
+
+    student.close(); 
     
+    // Check admin accounts
+    ifstream admin("admin.txt"); 
     while (admin >> fileID >> filePassword) {
         if (fileID == student_acc) { 
             if (filePassword == password) {
-                student.close();
-                return true;
                 admin_mode = true;
+                admin.close();
+                return true;
             } else {
-                student.close();
-                return false;
+                admin.close();
+                return false; 
             }
         }
     }
+
+    admin.close();
+    
     return false; 
 }
 
@@ -103,7 +107,6 @@ void login() {
             screen.ExitLoopClosure()();
         } else if (pass_check(input_id, input_password)) {
             studentID = input_id;
-            studentName = "Test Student";
             login_success = true;
             screen.ExitLoopClosure()();
         } else {
