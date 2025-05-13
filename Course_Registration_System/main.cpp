@@ -19,9 +19,11 @@
 using namespace ftxui;
 using namespace std;
 
+bool admin_mode = false;
 string studentID = "";
 string studentName = "";
 
+void login();
 void menu();  
 void course_history();
 void timetable();
@@ -29,11 +31,59 @@ void course_registration();
 void change_password();
 void logout();
 
+void account_find(string account) {
+
+}
+
+bool pass_check(string student_acc, string password) {
+    ifstream student("student.txt");  // Open the file
+    string fileID, filePassword;
+    
+    while (student >> fileID >> filePassword) {
+        if (fileID == student_acc) { 
+            if (filePassword == password) {
+                student.close();
+                return true;
+            } else {
+                student.close();
+                return false;
+            }
+        }
+    }
+    student.close();
+    admin_mode = false;
+    ifstream admin("admin.txt");
+    string fileID, filepassword;
+    
+    while (admin >> fileID >> filePassword) {
+        if (fileID == student_acc) { 
+            if (filePassword == password) {
+                student.close();
+                return true;
+                admin_mode = true;
+            } else {
+                student.close();
+                return false;
+            }
+        }
+    }
+    return false; 
+}
+
+
+void logout() {
+    system("cls"); 
+    studentID = "";
+    studentName = "";
+    login();
+}
+
 void login() {
+    system("cls"); 
     auto screen = ScreenInteractive::TerminalOutput();
     
-    std::string input_id;
-    std::string input_password;
+    string input_id;
+    string input_password;
     InputOption password_option;
     password_option.password = true;
     
@@ -42,16 +92,16 @@ void login() {
     
     auto title = text("Course Registration System") | bold | color(Color::Blue);
     
-    std::string error_message;
+    string error_message;
     bool should_quit = false;
     bool login_success = false;
     
-    // 创建登录按钮
+
     Component login_button = Button("Login", [&] {
         if (input_id.empty()) {
             should_quit = true;
             screen.ExitLoopClosure()();
-        } else if (input_id == "S1234567" && input_password == "EMIband1A") {
+        } else if (pass_check(input_id, input_password)) {
             studentID = input_id;
             studentName = "Test Student";
             login_success = true;
@@ -61,23 +111,26 @@ void login() {
         }
     });
 
-    // 创建退出按钮
-    Component quit_button = Button("Quit", screen.ExitLoopClosure());
+
+    Component quit_button = Button("Quit", [&] {
+        should_quit = true;
+        screen.ExitLoopClosure()();
+    });
     
-    // 创建按钮容器
+
     auto button_container = Container::Horizontal({
         login_button,
         quit_button
     });
 
-    // 创建主容器
+
     auto main_container = Container::Vertical({
         id_input,
         password_input,
         button_container
     });
 
-    // 创建渲染器
+
     auto renderer = Renderer(main_container, [&] {
         return vbox({
             title | hcenter,
@@ -98,7 +151,7 @@ void login() {
         }) | border;
     });
 
-    // 添加事件处理
+
     auto event_handler = CatchEvent(renderer, [&](Event event) {
         if (event == Event::Character('q') || event == Event::Character('Q')) {
             should_quit = true;
@@ -110,13 +163,14 @@ void login() {
 
     screen.Loop(event_handler);
 
-    // 如果登录成功且不是退出，则进入主菜单
+
     if (login_success && !should_quit) {
         menu();
     }
 }
 
 void menu() {
+    system("cls");
     auto screen = ScreenInteractive::TerminalOutput();
     bool should_quit = false;
     bool next_page = false;
@@ -180,17 +234,25 @@ void menu() {
     screen.Loop(event_handler);
 
     if (next_page) {
+        system("cls"); 
         switch (next_page_index) {
             case 0: course_history(); break;
             case 1: timetable(); break;
             case 2: course_registration(); break;
             case 3: change_password(); break;
-            case 4: logout(); break;
+            case 4: {
+                system("cls");
+                studentID = "";
+                studentName = "";
+                login();
+                return; 
+            }
         }
     }
 }
 
 void course_history() {
+    system("cls");  
     auto screen = ScreenInteractive::TerminalOutput();
     bool should_quit = false;
     
@@ -217,10 +279,12 @@ void course_history() {
     });
 
     screen.Loop(event_handler);
+    system("cls");
     menu();
 }
 
 void timetable() {
+    system("cls");
     auto screen = ScreenInteractive::TerminalOutput();
     bool should_quit = false;
     
@@ -247,10 +311,12 @@ void timetable() {
     });
 
     screen.Loop(event_handler);
+    system("cls");
     menu();
 }
 
 void course_registration() {
+    system("cls");
     auto screen = ScreenInteractive::TerminalOutput();
     bool should_quit = false;
     
@@ -277,10 +343,12 @@ void course_registration() {
     });
 
     screen.Loop(event_handler);
+    system("cls");
     menu();
 }
 
 void change_password() {
+    system("cls");
     auto screen = ScreenInteractive::TerminalOutput();
     bool should_quit = false;
     
@@ -307,13 +375,8 @@ void change_password() {
     });
 
     screen.Loop(event_handler);
+    system("cls");  
     menu();
-}
-
-void logout() {
-    studentID = "";
-    studentName = "";
-    login();
 }
 
 int main () {
