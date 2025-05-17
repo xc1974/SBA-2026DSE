@@ -20,19 +20,29 @@ using namespace ftxui;
 using namespace std;
 
 bool admin_mode = false;
-string studentID = "";
-string studentName = "";
+string ID = "";
+string Name = "";
 
 void login();
-void menu();  
+void menu_student();  
 void course_history();
 void timetable();
 void course_registration(); 
 void change_password();
 void logout();
+void menu_admin();
+void manage_courses();
+void manage_student_records();
+void account_find(string account);
 
-void account_find(string account) {
-
+void Name_modify(string s) {
+    int length = s.length();
+    for (int i = 0; i < length; i++) {
+        if (s[i] == '_') {
+            s[i] = ' ';
+        }
+    }
+    Name = s;
 }
 
 bool pass_check(string student_acc, string password) {
@@ -42,24 +52,24 @@ bool pass_check(string student_acc, string password) {
     while (student >> fileID >> filePassword >> fileusername) {
         if (fileID == student_acc) { 
             if (filePassword == password) {
-                studentName = fileusername;
+                Name = fileusername;
+                Name_modify(Name);
                 student.close();
                 return true;
             } else {
                 student.close();
-                return false;
             }
         }
     }
-
-    student.close(); 
-    
+        
     // Check admin accounts
     ifstream admin("admin.txt"); 
-    while (admin >> fileID >> filePassword) {
+    while (admin >> fileID >> filePassword >> fileusername) {
         if (fileID == student_acc) { 
             if (filePassword == password) {
                 admin_mode = true;
+                Name = fileusername;
+                Name_modify(Name);
                 admin.close();
                 return true;
             } else {
@@ -70,15 +80,14 @@ bool pass_check(string student_acc, string password) {
     }
 
     admin.close();
-    
     return false; 
 }
 
 
 void logout() {
     system("cls"); 
-    studentID = "";
-    studentName = "";
+    ID = "";
+    Name = "";
     login();
 }
 
@@ -106,7 +115,7 @@ void login() {
             should_quit = true;
             screen.ExitLoopClosure()();
         } else if (pass_check(input_id, input_password)) {
-            studentID = input_id;
+            ID = input_id;
             login_success = true;
             screen.ExitLoopClosure()();
         } else {
@@ -140,7 +149,7 @@ void login() {
             separator(),
             text("Please login to continue") | hcenter,
             separator(),
-            hbox(text(" Student ID: "), id_input->Render()) | hcenter,
+            hbox(text(" ID: "), id_input->Render()) | hcenter,
             hbox(text(" Password:  "), password_input->Render()) | hcenter,
             separator(),
             hbox({
@@ -168,11 +177,15 @@ void login() {
 
 
     if (login_success && !should_quit) {
-        menu();
+        if (admin_mode == false) {
+            menu_student();
+        } else {
+            menu_admin();
+        }
     }
 }
 
-void menu() {
+void menu_student() {
     system("cls");
     auto screen = ScreenInteractive::TerminalOutput();
     bool should_quit = false;
@@ -184,11 +197,11 @@ void menu() {
     auto student_info = vbox({
         hbox({
             text("Student ID: ") | color(Color::GrayDark),
-            text(studentID) | color(Color::Blue)
+            text(ID) | color(Color::Blue)
         }),
         hbox({
             text("Student Name: ") | color(Color::GrayDark),
-            text(studentName) | color(Color::Blue)
+            text(Name) | color(Color::Blue)
         })
     });
 
@@ -245,12 +258,91 @@ void menu() {
             case 3: change_password(); break;
             case 4: {
                 system("cls");
-                studentID = "";
-                studentName = "";
+                ID = "";
+                Name = "";
                 login();
                 return; 
             }
         }
+    }
+}
+
+void menu_admin() {
+    system("cls");
+    auto screen = ScreenInteractive::TerminalOutput();
+    bool should_quit = false;
+    bool next_page = false;
+    int next_page_index = -1;
+    
+    auto title = text("Course Registration System") | bold | color(Color::Blue);
+    
+    auto student_info = vbox({
+        hbox({
+            text("Teacher ID: ") | color(Color::GrayDark),
+            text(ID) | color(Color::Blue)
+        }),
+        hbox({
+            text("Teacher Name: ") | color(Color::GrayDark),
+            text(Name) | color(Color::Blue)
+        })
+    });
+
+    vector<string> menu_entries = {
+        "Management student records",
+        "Manage courses",
+        "Change password",
+        "Logout"
+    };
+    
+    int selected = 0;
+    auto menu = Menu(&menu_entries, &selected);
+
+    auto main_container = Container::Vertical({
+        menu
+    });
+
+    auto renderer = Renderer(main_container, [&] {
+        return vbox({
+            title | hcenter,
+            separator(),
+            student_info | hcenter,
+            separator(),
+            menu->Render(),
+            filler(),
+            text("Press Q to quit") | color(Color::GrayDark) | hcenter,
+        }) | border;
+    });
+
+    auto event_handler = CatchEvent(renderer, [&](Event event) {
+        if (event == Event::Return) {
+            next_page = true;
+            next_page_index = selected;
+            screen.ExitLoopClosure()();
+            return true;
+        }
+        if (event == Event::Character('q') || event == Event::Character('Q')) {
+            should_quit = true;
+            screen.ExitLoopClosure()();
+            return true;
+        }
+        return false;
+    });
+
+    screen.Loop(event_handler);
+
+    if (next_page) {
+        system("cls"); 
+        switch(next_page_index) {
+            case 0: manage_student_records();   break;
+            case 1: manage_courses();           break;
+            case 2: change_password();          break;
+            case 3: { 
+                admin_mode = false; 
+                ID.clear(); Name.clear();
+                login();
+            } break;
+        }
+
     }
 }
 
@@ -283,7 +375,7 @@ void course_history() {
 
     screen.Loop(event_handler);
     system("cls");
-    menu();
+    menu_student();
 }
 
 void timetable() {
@@ -315,7 +407,7 @@ void timetable() {
 
     screen.Loop(event_handler);
     system("cls");
-    menu();
+    menu_student();
 }
 
 void course_registration() {
@@ -347,7 +439,71 @@ void course_registration() {
 
     screen.Loop(event_handler);
     system("cls");
-    menu();
+    menu_student();
+}
+
+void manage_student_records() {
+    system("cls");
+    auto screen = ScreenInteractive::TerminalOutput();
+    bool should_quit = false;
+    
+    auto title = text("Manage Student Records") | bold | color(Color::Blue);
+    
+    auto container = Container::Vertical({});
+
+    auto renderer = Renderer(container, [&] {
+        return vbox({
+            title | hcenter,
+            separator(),
+            text("No Management available.") | hcenter,
+            filler(),
+            text("Press Q to return") | color(Color::GrayDark) | hcenter,
+        }) | border;
+    });
+
+    auto event_handler = CatchEvent(renderer, [&](Event event) {
+        if (event == Event::Character('q') || event == Event::Character('Q')) {
+            screen.ExitLoopClosure()();
+            return true;
+        }
+        return false;
+    });
+
+    screen.Loop(event_handler);
+    system("cls");
+    menu_admin();
+}
+
+void manage_courses() {
+    system("cls");
+    auto screen = ScreenInteractive::TerminalOutput();
+    bool should_quit = false;
+    
+    auto title = text("manage courses") | bold | color(Color::Blue);
+    
+    auto container = Container::Vertical({});
+
+    auto renderer = Renderer(container, [&] {
+        return vbox({
+            title | hcenter,
+            separator(),
+            text("No management available.") | hcenter,
+            filler(),
+            text("Press Q to return") | color(Color::GrayDark) | hcenter,
+        }) | border;
+    });
+
+    auto event_handler = CatchEvent(renderer, [&](Event event) {
+        if (event == Event::Character('q') || event == Event::Character('Q')) {
+            screen.ExitLoopClosure()();
+            return true;
+        }
+        return false;
+    });
+
+    screen.Loop(event_handler);
+    system("cls");
+    menu_admin();
 }
 
 void change_password() {
@@ -378,9 +534,15 @@ void change_password() {
     });
 
     screen.Loop(event_handler);
-    system("cls");  
-    menu();
+    system("cls"); 
+    if (admin_mode == false) {
+        menu_student();
+    } else {
+        menu_admin();
+    }
 }
+
+void menu_admin();
 
 int main () {
     login();
