@@ -506,6 +506,14 @@ void manage_courses() {
     menu_admin();
 }
 
+void check_password(string password, string verification) {
+    if (password == verification) {
+        if (admin_mode = true) {
+            
+        }
+    }
+}
+
 void change_password() {
     system("cls");
     auto screen = ScreenInteractive::TerminalOutput();
