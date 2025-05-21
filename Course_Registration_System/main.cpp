@@ -9,6 +9,8 @@
 #include <fstream>
 #include <algorithm>
 #include <windows.h>
+#include <chrono>
+#include <thread>
 
 // FTXUI headers
 #include <ftxui/component/component.hpp>
@@ -18,6 +20,10 @@
 
 using namespace ftxui;
 using namespace std;
+
+using namespace std::this_thread;     // sleep_for, sleep_until
+using namespace std::chrono_literals; // ns, us, ms, s, h, etc.
+using std::chrono::system_clock;
 
 bool admin_mode = false;
 string ID = "";
@@ -506,48 +512,128 @@ void manage_courses() {
     menu_admin();
 }
 
-void check_password(string password, string verification) {
-    if (password == verification) {
-        if (admin_mode = true) {
-            
+bool check_password(string oldpassword, string newpassword, string verification) {
+    string fileID, filePassword, fileusername;
+    vector<string> records; // To hold all records
+
+    if (admin_mode) {
+        ifstream admin("admin.txt");
+        bool userFound = false;
+
+        while (admin >> fileID >> filePassword >> fileusername) {
+            if (fileID == ID && filePassword == oldpassword && newpassword == verification) {
+                filePassword = verification; // Update password
+                userFound = true;
+            }
+            records.push_back(fileID + " " + filePassword + " " + fileusername); // Store record
+        }
+
+        admin.close();
+
+        if (userFound) {
+            ofstream adminOut("admin.txt");
+            for (const auto& record : records) {
+                adminOut << record << endl; // Write all records back
+            }
+            return true;
+        } 
+    } else {
+        ifstream student("student.txt");
+        bool userFound = false;
+
+        while (student >> fileID >> filePassword >> fileusername) {
+            if (fileID == ID && filePassword == oldpassword && newpassword == verification) {
+                filePassword = verification; // Update password
+                userFound = true;
+            }
+            records.push_back(fileID + " " + filePassword + " " + fileusername); // Store record
+        }
+
+        student.close();
+
+        if (userFound) {
+            ofstream studentOut("student.txt");
+            for (const auto& record : records) {
+                studentOut << record << endl; // Write all records back
+            }
+            return true;
         }
     }
+
+    return false; // If no changes were made
 }
 
 void change_password() {
-    system("cls");
-    auto screen = ScreenInteractive::TerminalOutput();
-    bool should_quit = false;
-    
-    auto title = text("Change Password") | bold | color(Color::Blue);
-    
-    auto container = Container::Vertical({});
-
-    auto renderer = Renderer(container, [&] {
-        return vbox({
-            title | hcenter,
-            separator(),
-            text("Password change functionality not implemented.") | hcenter,
-            filler(),
-            text("Press Q to return") | color(Color::GrayDark) | hcenter,
-        }) | border;
-    });
-
-    auto event_handler = CatchEvent(renderer, [&](Event event) {
-        if (event == Event::Character('q') || event == Event::Character('Q')) {
-            screen.ExitLoopClosure()();
-            return true;
-        }
-        return false;
-    });
-
-    screen.Loop(event_handler);
-    system("cls"); 
-    if (admin_mode == false) {
-        menu_student();
-    } else {
-        menu_admin();
+  system("cls");
+  auto screen = ScreenInteractive::TerminalOutput();
+  string old_pw, new_pw, verify_pw;
+  InputOption opt; opt.password = true;
+  auto old_input = Input(&old_pw,    "Old password", opt);
+  auto new_input = Input(&new_pw,    "New password", opt);
+  auto ver_input = Input(&verify_pw,"Verify new password",   opt);
+  string error_message;
+  bool password_changed = false;
+  auto submit_button = Button("Submit", [&] {
+    if (old_pw.empty() || new_pw.empty() || verify_pw.empty()) {
+      error_message = "All fields are required.";
+      return;
     }
+    if (new_pw != verify_pw) {
+      error_message = "New & verify do not match.";
+      return;
+    }
+    if (!check_password(old_pw, new_pw, verify_pw)) {
+      error_message = "Bad old password or file I/O error.";
+      return;
+    }
+    password_changed = true;
+    error_message = "Password changed successfully! System will turn you back in 1 seconds.";
+    screen.ExitLoopClosure()();
+  });
+  auto cancel_button = Button("Cancel", [&] {
+    screen.ExitLoopClosure()();
+  });
+  auto button_container = Container::Horizontal({
+    submit_button,
+    cancel_button
+  });
+  auto main_container = Container::Vertical({
+    old_input,
+    new_input,
+    ver_input,
+    button_container
+  });
+  auto renderer = Renderer(main_container, [&] {
+    return vbox({
+      text("Change Password") | bold | color(Color::Blue) | hcenter,
+      separator(),
+      hbox(text("Old password:  "), old_input->Render()) | hcenter,
+      hbox(text("New password:  "), new_input->Render()) | hcenter,
+      hbox(text("Verify new pw: "), ver_input->Render()) | hcenter,
+      separator(),
+      hbox({
+        submit_button->Render(),
+        text(" "),
+        cancel_button->Render()
+      }) | hcenter,
+      filler(),
+      text(error_message) | color(Color::Red) | hcenter,
+      text("Press Q to quit") | color(Color::GrayDark) | hcenter
+    }) | border;
+  });
+  auto event_handler = CatchEvent(renderer, [&](Event event) {
+    if (event == Event::Character('q') || event == Event::Character('Q')) {
+      screen.ExitLoopClosure()();
+      return true;
+    }
+    return false;
+  });
+  screen.Loop(event_handler);
+  system("cls");
+  if (admin_mode)
+    menu_admin();
+  else
+    menu_student();
 }
 
 void menu_admin();
