@@ -21,14 +21,12 @@
 using namespace ftxui;
 using namespace std;
 
-using namespace std::this_thread;     // sleep_for, sleep_until
-using namespace std::chrono_literals; // ns, us, ms, s, h, etc.
-using std::chrono::system_clock;
-
 bool admin_mode = false;
 string ID = "";
 string Name = "";
 
+void new_password(string ID, string password, string Name);
+void register_page();
 void login();
 void menu_student();  
 void course_history();
@@ -40,6 +38,9 @@ void menu_admin();
 void manage_courses();
 void manage_student_records();
 void account_find(string account);
+string check_pass(string pass);
+void loading_screen();
+void loading();
 
 void Name_modify(string s) {
     int length = s.length();
@@ -53,24 +54,27 @@ void Name_modify(string s) {
 
 bool pass_check(string student_acc, string password) {
     ifstream student("student.txt");
-    string fileID, filePassword, fileusername;
-    // Check student accounts
-    while (student >> fileID >> filePassword >> fileusername) {
+    string line;
+    while (getline(student, line)) {
+        istringstream iss(line);
+        string fileID, filePassword, fileusername;
+        iss >> fileID >> filePassword >> fileusername;
         if (fileID == student_acc) { 
             if (filePassword == password) {
                 Name = fileusername;
                 Name_modify(Name);
                 student.close();
                 return true;
-            } else {
-                student.close();
             }
         }
     }
+    student.close();
         
-    // Check admin accounts
     ifstream admin("admin.txt"); 
-    while (admin >> fileID >> filePassword >> fileusername) {
+    while (getline(admin, line)) {
+        istringstream iss(line);
+        string fileID, filePassword, fileusername;
+        iss >> fileID >> filePassword >> fileusername;
         if (fileID == student_acc) { 
             if (filePassword == password) {
                 admin_mode = true;
@@ -78,13 +82,9 @@ bool pass_check(string student_acc, string password) {
                 Name_modify(Name);
                 admin.close();
                 return true;
-            } else {
-                admin.close();
-                return false; 
             }
         }
     }
-
     admin.close();
     return false; 
 }
@@ -95,6 +95,90 @@ void logout() {
     ID = "";
     Name = "";
     login();
+}
+
+void loading_screen() {
+    auto screen = ScreenInteractive::TerminalOutput();
+    bool should_quit = false;
+    int frame_count = 0;
+    float progress = 0.0f;
+    
+    vector<string> tasks = {
+        "Loading user data...",
+        "Initializing system...",
+        "Preparing interface...",
+        "Checking permissions...",
+        "Almost there..."
+    };
+    
+    auto title = text("Loading System") | bold | color(Color::Blue);
+    
+    auto container = Container::Vertical({});
+
+    auto renderer = Renderer(container, [&] {
+        vector<Element> elements;
+        elements.push_back(title | hcenter);
+        elements.push_back(separator());
+        
+        const char spinner[] = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏";
+        int spinner_index = frame_count % 10;
+        string spinner_str = string(1, spinner[spinner_index]);
+        
+        progress = (float)frame_count / 10.0f; 
+        if (progress > 1.0f) progress = 1.0f;
+        
+        // Current task
+        int task_index = (progress * tasks.size());
+        if (task_index >= tasks.size()) task_index = tasks.size() - 1;
+        
+        elements.push_back(vbox({
+            hbox({
+                text(spinner_str) | color(Color::Yellow),
+                text(" ") | bold,
+                text(tasks[task_index]) | color(Color::GrayDark)
+            }) | hcenter,
+            text("") | hcenter,
+            gauge(progress) | color(Color::Green) | hcenter,
+            text("") | hcenter,
+            text(to_string((int)(progress * 100)) + "%") | color(Color::Blue) | hcenter
+        }));
+        
+        elements.push_back(filler());
+        elements.push_back(text("Please wait while we prepare your workspace...") | color(Color::GrayDark) | hcenter);
+        
+        frame_count++;
+        if (frame_count >= 10) {
+            screen.ExitLoopClosure()();
+        }
+        
+        return vbox(elements) | border;
+    });
+
+    auto event_handler = CatchEvent(renderer, [&](Event event) {
+        if (event == Event::Character('q') || event == Event::Character('Q')) {
+            should_quit = true;
+            screen.ExitLoopClosure()();
+            return true;
+        }
+        return false;
+    });
+
+    auto animation_loop = [&]() {
+        while (frame_count < 10) { 
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            screen.PostEvent(Event::Custom);
+        }
+    };
+
+    std::thread animation_thread(animation_loop);
+    animation_thread.detach();
+
+    screen.Loop(event_handler);
+    if (admin_mode == true) {
+        menu_admin();
+    } else {
+        menu_student();
+    }
 }
 
 void login() {
@@ -118,8 +202,7 @@ void login() {
 
     Component login_button = Button("Login", [&] {
         if (input_id.empty()) {
-            should_quit = true;
-            screen.ExitLoopClosure()();
+            error_message = "All fields are required.";
         } else if (pass_check(input_id, input_password)) {
             ID = input_id;
             login_success = true;
@@ -135,10 +218,16 @@ void login() {
         screen.ExitLoopClosure()();
     });
     
+    Component register_button = Button("Register", [&] {
+        should_quit = true;
+        screen.ExitLoopClosure()();
+        register_page();
+    });
 
     auto button_container = Container::Horizontal({
         login_button,
-        quit_button
+        quit_button,
+        register_button
     });
 
 
@@ -162,6 +251,8 @@ void login() {
                 login_button->Render(),
                 text(" "),
                 quit_button->Render(),
+                text(" "),
+                register_button->Render(),
             }) | hcenter,
             filler(),
             text(error_message) | color(Color::Red) | hcenter,
@@ -183,6 +274,9 @@ void login() {
 
 
     if (login_success && !should_quit) {
+        system("cls");
+        loading_screen();
+        std::this_thread::sleep_for(std::chrono::seconds(1));
         if (admin_mode == false) {
             menu_student();
         } else {
@@ -190,6 +284,84 @@ void login() {
         }
     }
 }
+
+void register_page() {
+    system("cls");
+    auto screen = ScreenInteractive::TerminalOutput();
+    string ID, new_pw, verify_pw, Name;
+    InputOption opt; opt.password = true;
+    InputOption name_opt; 
+    auto old_input = Input(&ID,"ID", opt);
+    auto name_input = Input(&Name,"Name", name_opt);
+    auto new_input = Input(&new_pw,"password", opt);
+    auto ver_input = Input(&verify_pw,"Verify password", opt);
+    string error_message;
+    bool password_changed = false;
+    auto submit_button = Button("Submit", [&] {
+        if (ID.empty() || new_pw.empty() || verify_pw.empty() || Name.empty()) {
+            error_message = "All fields are required.";
+            return;
+        } else if (new_pw != verify_pw) {
+            error_message = "Passwords do not match!";
+            return;
+        } else {
+            if (check_pass(new_pw) != "ok") {
+                error_message = check_pass(new_pw);
+                return;
+            } else {
+                new_password(ID, new_pw, Name);
+            }
+        }
+        password_changed = true;
+        error_message = "Account registered successfully! System will turn you back in 1 seconds.";
+        screen.ExitLoopClosure()();
+    });
+    auto cancel_button = Button("Cancel", [&] {
+        screen.ExitLoopClosure()();
+    });
+    auto button_container = Container::Horizontal({
+        submit_button,
+        cancel_button
+    });
+    auto main_container = Container::Vertical({
+        old_input,
+        name_input,
+        new_input,
+        ver_input,
+        button_container
+    });
+    auto renderer = Renderer(main_container, [&] {
+        return vbox({
+            text("Register") | bold | color(Color::Blue) | hcenter,
+            separator(),
+            hbox(text("ID:  "), old_input->Render()) | hcenter,
+            hbox(text("Name:  "), name_input->Render()) | hcenter,
+            hbox(text("password:  "), new_input->Render()) | hcenter,
+            hbox(text("Verify password: "), ver_input->Render()) | hcenter,
+            separator(),
+            hbox({
+                submit_button->Render(),
+                text(" "),
+                cancel_button->Render()
+            }) | hcenter,
+            filler(),
+            text(error_message) | color(Color::Red) | hcenter,
+            text("Press Q to quit") | color(Color::GrayDark) | hcenter
+        }) | border;
+    });
+    auto event_handler = CatchEvent(renderer, [&](Event event) {
+        if (event == Event::Character('q') || event == Event::Character('Q')) {
+            screen.ExitLoopClosure()();
+            return true;
+        }
+        return false;
+    });
+    screen.Loop(event_handler);
+    system("cls");
+    loading();
+    login();
+}
+
 
 void menu_student() {
     system("cls");
@@ -258,9 +430,9 @@ void menu_student() {
     if (next_page) {
         system("cls"); 
         switch (next_page_index) {
-            case 0: course_history(); break;
-            case 1: timetable(); break;
-            case 2: course_registration(); break;
+            case 0: loading(); course_history(); break;
+            case 1: loading(); timetable(); break;
+            case 2: loading(); course_registration(); break;
             case 3: change_password(); break;
             case 4: {
                 system("cls");
@@ -339,8 +511,8 @@ void menu_admin() {
     if (next_page) {
         system("cls"); 
         switch(next_page_index) {
-            case 0: manage_student_records();   break;
-            case 1: manage_courses();           break;
+            case 0: loading(); manage_student_records();   break;
+            case 1: loading(); manage_courses();           break;
             case 2: change_password();          break;
             case 3: { 
                 admin_mode = false; 
@@ -381,6 +553,7 @@ void course_history() {
 
     screen.Loop(event_handler);
     system("cls");
+    loading();
     menu_student();
 }
 
@@ -412,7 +585,9 @@ void timetable() {
     });
 
     screen.Loop(event_handler);
+    
     system("cls");
+    loading();
     menu_student();
 }
 
@@ -445,6 +620,7 @@ void course_registration() {
 
     screen.Loop(event_handler);
     system("cls");
+    loading();
     menu_student();
 }
 
@@ -512,20 +688,20 @@ void manage_courses() {
     menu_admin();
 }
 
-bool check_password(string oldpassword, string newpassword, string verification) {
+bool check_password(string oldpassword, string newpassword) {
     string fileID, filePassword, fileusername;
-    vector<string> records; // To hold all records
+    vector<string> records;
 
     if (admin_mode) {
         ifstream admin("admin.txt");
         bool userFound = false;
 
         while (admin >> fileID >> filePassword >> fileusername) {
-            if (fileID == ID && filePassword == oldpassword && newpassword == verification) {
-                filePassword = verification; // Update password
+            if (fileID == ID && filePassword == oldpassword) {
+                filePassword = newpassword;
                 userFound = true;
             }
-            records.push_back(fileID + " " + filePassword + " " + fileusername); // Store record
+            records.push_back(fileID + " " + filePassword + " " + fileusername);
         }
 
         admin.close();
@@ -533,7 +709,7 @@ bool check_password(string oldpassword, string newpassword, string verification)
         if (userFound) {
             ofstream adminOut("admin.txt");
             for (const auto& record : records) {
-                adminOut << record << endl; // Write all records back
+                adminOut << record << endl;
             }
             return true;
         } 
@@ -542,11 +718,11 @@ bool check_password(string oldpassword, string newpassword, string verification)
         bool userFound = false;
 
         while (student >> fileID >> filePassword >> fileusername) {
-            if (fileID == ID && filePassword == oldpassword && newpassword == verification) {
-                filePassword = verification; // Update password
+            if (fileID == ID && filePassword == oldpassword) {
+                filePassword = newpassword;
                 userFound = true;
             }
-            records.push_back(fileID + " " + filePassword + " " + fileusername); // Store record
+            records.push_back(fileID + " " + filePassword + " " + fileusername);
         }
 
         student.close();
@@ -554,13 +730,13 @@ bool check_password(string oldpassword, string newpassword, string verification)
         if (userFound) {
             ofstream studentOut("student.txt");
             for (const auto& record : records) {
-                studentOut << record << endl; // Write all records back
+                studentOut << record << endl;
             }
             return true;
         }
     }
 
-    return false; // If no changes were made
+    return false;
 }
 
 void change_password() {
@@ -582,8 +758,12 @@ void change_password() {
       error_message = "New & verify do not match.";
       return;
     }
-    if (!check_password(old_pw, new_pw, verify_pw)) {
-      error_message = "Bad old password or file I/O error.";
+    if (!check_password(old_pw, new_pw)) {
+      error_message = "Bad password.";
+      return;
+    }
+    if (check_pass(new_pw) != "ok") {
+      error_message = check_pass(new_pw);
       return;
     }
     password_changed = true;
@@ -609,7 +789,7 @@ void change_password() {
       separator(),
       hbox(text("Old password:  "), old_input->Render()) | hcenter,
       hbox(text("New password:  "), new_input->Render()) | hcenter,
-      hbox(text("Verify new pw: "), ver_input->Render()) | hcenter,
+      hbox(text("Verify new password: "), ver_input->Render()) | hcenter,
       separator(),
       hbox({
         submit_button->Render(),
@@ -629,14 +809,113 @@ void change_password() {
     return false;
   });
   screen.Loop(event_handler);
+  
+  if (password_changed) {
+    system("cls");
+    loading();
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+  }
+  
   system("cls");
-  if (admin_mode)
+  if (admin_mode) {
     menu_admin();
-  else
+  } else {
     menu_student();
+  }
 }
 
-void menu_admin();
+void new_password(string ID, string password, string Name) {
+    vector<string> records;
+    string line;
+    ifstream student("student.txt");
+    while (getline(student, line)) {
+        records.push_back(line);
+    }
+    student.close();
+    for (int i = 0; i < Name.size(); i++) {
+        if (Name[i] == ' ') {
+            Name[i] = '_';
+        }
+    }
+    string new_record = ID + " " + password + " " + Name;
+    records.push_back(new_record);
+    ofstream studentOut("student.txt");
+    for (const auto& record : records) {
+        studentOut << record << endl;
+    }
+    studentOut.close();
+}
+
+string check_pass (string pass) {
+    if (pass.size() < 8) {
+        return "Your password should consist at least 8 characters long";
+    } else {
+        int countlarge = 0; int countsmall = 0; int countspecial = 0;
+        for (int i = 0 ; i < pass.size(); i++) {
+            if (pass[i] >= 'a' && pass[i] <= 'z') {
+                countsmall ++;
+            }
+            if (pass[i] >= 'A' && pass[i] <= 'Z') {
+                countlarge ++;
+            }
+            if (pass[i] == '_' || pass[i] == '-' || pass[i] == '!' || pass[i] == '"' || pass[i] == '@' || pass[i] == '#' || pass[i] == '$' || pass[i] == '%' || pass[i] == '^' || pass[i] == '&' || pass[i] == '*' || pass[i] == '(' || pass[i] == ')') {
+                countspecial ++;
+            }
+        }
+        if (countlarge == 0 || countsmall == 0) {
+            return "Your password should consist both uppercase and lowercase letter";
+        } else if (countspecial == 0) {
+            return "Your password should consist special latter";
+        } else {
+            return "ok";
+        }
+    }
+}
+
+void loading() {
+    system("cls");
+    auto screen = ScreenInteractive::TerminalOutput();
+    int frame = 0;
+    
+    auto container = Container::Vertical({});
+    
+    auto renderer = Renderer(container, [&] {
+        return vbox({
+            text("Loading...") | bold | color(Color::Blue) | hcenter,
+            separator(),
+            hbox({
+                spinner(1, frame) | color(Color::Yellow),
+                text(" ") | bold,
+                text("Processing") | color(Color::GrayDark)
+            }) | hcenter,
+            filler()
+        }) | border;
+    });
+
+    auto event_handler = CatchEvent(renderer, [&](Event event) {
+        if (event == Event::Custom) {
+            frame++;
+            if (frame >= 10) {
+                screen.ExitLoopClosure()();
+            }
+            return true;
+        }
+        return false;
+    });
+
+    auto animation_loop = [&]() {
+        while (frame < 10) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            screen.PostEvent(Event::Custom);
+        }
+    };
+
+    std::thread animation_thread(animation_loop);
+    animation_thread.detach();
+
+    screen.Loop(event_handler);
+    return;
+}
 
 int main () {
     login();
