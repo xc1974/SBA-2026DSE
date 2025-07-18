@@ -883,6 +883,131 @@ void Management_student_records() {
     login();
 }
 
+void Create_account() {
+    system("cls");
+    auto screen = ScreenInteractive::TerminalOutput();
+    string ID, Name, Password, Confirm_Password;
+    InputOption opt;
+    auto ID_input = Input(&ID, "ID", opt);
+    auto Name_input = Input(&Name, "Name", opt);
+    auto Password_input = Input(&Password, "Password", opt);
+    auto Confirm_Password_input = Input(&Confirm_Password, "Confirm Password", opt);
+    string error_message;
+    auto submit_button = Button("Submit", [&] {
+        if (ID.empty() || Name.empty() || Password.empty() || Confirm_Password.empty()) {
+            error_message = "All fields are required.";
+            return;
+        }
+        if (Password != Confirm_Password) {
+            error_message = "Passwords do not match.";
+            return;
+        }
+        if (check_pass(Password) != "ok") {
+            error_message = check_pass(Password);
+            return;
+        }
+        error_message = "Account created successfully! System will turn you back in 1 seconds.";
+        screen.ExitLoopClosure()();
+    });
+    auto cancel_button = Button("Cancel", [&] {
+        screen.ExitLoopClosure()();
+    });
+    auto button_container = Container::Horizontal({
+        submit_button,
+        cancel_button
+    });
+    auto main_container = Container::Vertical({
+        ID_input,   
+        Name_input,
+        Password_input,
+        Confirm_Password_input,
+        button_container
+    });
+    auto renderer = Renderer(main_container, [&] {
+        return vbox({
+            text("Create an account") | bold | color(Color::Blue) | hcenter,
+            separator(),
+            hbox(text("ID:  "), ID_input->Render()) | hcenter,
+            hbox(text("Name:  "), Name_input->Render()) | hcenter,
+            hbox(text("Password:  "), Password_input->Render()) | hcenter,
+            hbox(text("Confirm Password:  "), Confirm_Password_input->Render()) | hcenter,
+            separator(),
+            hbox({
+                submit_button->Render(),
+                text(" "),
+                cancel_button->Render()
+            }) | hcenter,
+            filler(),
+            text(error_message) | color(Color::Red) | hcenter,
+            text("Press esc to quit") | color(Color::GrayDark) | hcenter
+        }) | border;
+    });
+    auto event_handler = CatchEvent(renderer, [&](Event event) {
+        if (event == Event::Escape) {
+            screen.ExitLoopClosure()();
+            return true;
+        }
+        return false;
+    });
+    screen.Loop(event_handler);
+    system("cls");
+    login();
+}
+
+void Delete_account() {
+    system("cls");
+    auto screen = ScreenInteractive::TerminalOutput();
+    string ID;
+    InputOption opt;
+    auto ID_input = Input(&ID, "ID", opt); 
+    string error_message;
+    auto submit_button = Button("Submit", [&] {
+        if (ID.empty()) {
+            error_message = "All fields are required.";
+            return;
+        } 
+        error_message = "Account deleted successfully! System will turn you back in 1 seconds.";
+        screen.ExitLoopClosure()();
+    });
+    auto cancel_button = Button("Cancel", [&] {
+        screen.ExitLoopClosure()();
+    });
+    auto button_container = Container::Horizontal({
+        submit_button,
+        cancel_button
+    });
+    auto main_container = Container::Vertical({
+        ID_input,
+        button_container
+    });
+    auto renderer = Renderer(main_container, [&] {
+        return vbox({
+            text("Delete an account") | bold | color(Color::Blue) | hcenter,
+            separator(),
+            hbox(text("ID:  "), ID_input->Render()) | hcenter,
+            separator(),
+            hbox({
+                submit_button->Render(),
+                text(" "),
+                cancel_button->Render()
+            }) | hcenter,
+            filler(),
+            text(error_message) | color(Color::Red) | hcenter,
+            text("Press esc to quit") | color(Color::GrayDark) | hcenter
+        }) | border;
+    });
+    auto event_handler = CatchEvent(renderer, [&](Event event) {
+        if (event == Event::Escape) {
+            screen.ExitLoopClosure()();
+            return true;
+        }
+        return false;
+    });
+    screen.Loop(event_handler);
+    system("cls");
+    login();
+}
+
 int main () {
-    Management_student_records();
+    login();
 }
