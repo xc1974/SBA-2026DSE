@@ -39,6 +39,10 @@ void manage_courses();
 void manage_student_records();
 void account_find(string account);
 string check_pass(string pass);
+void Add_course();
+void Management_student_records();
+void Create_account();
+void Delete_account();
 
 void Name_modify(string s) {
     int length = s.length();
@@ -778,6 +782,8 @@ string check_pass (string pass) {
         }
     }
 }
+
+// Stage two
 
 void Add_course() {
     system("cls");
