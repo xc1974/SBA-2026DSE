@@ -779,6 +779,110 @@ string check_pass (string pass) {
     }
 }
 
-int main () {
+void Add_course() {
+    system("cls");
+    auto screen = ScreenInteractive::TerminalOutput();
+    string CourseID, CourseName, CourseRoom,CourseCredit, CourseDate, CourseTime;
+    InputOption opt; 
+    auto CourseID_input = Input(&CourseID,"Course ID", opt);
+    auto CourseName_input = Input(&CourseName,"Course Name", opt);
+    auto CourseRoom_input = Input(&CourseRoom,"Course Room", opt);
+    auto CourseCredit_input = Input(&CourseCredit,"Course Credit", opt);
+    auto CourseDate_input = Input(&CourseDate,"Course Date", opt);
+    auto CourseTime_input = Input(&CourseTime,"Course Time", opt);
+    string error_message;
+    auto submit_button = Button("Submit", [&] {
+        if (CourseID.empty() || CourseName.empty() || CourseRoom.empty() || CourseCredit.empty() || CourseDate.empty() || CourseTime.empty()) {
+            error_message = "All fields are required.";
+            return;
+        } 
+        error_message = "Course added successfully! System will turn you back in 1 seconds.";
+        screen.ExitLoopClosure()();
+    });
+    auto cancel_button = Button("Cancel", [&] {
+        screen.ExitLoopClosure()();
+    });
+    auto button_container = Container::Horizontal({
+        submit_button,
+        cancel_button
+    });
+    auto main_container = Container::Vertical({
+        CourseID_input,
+        CourseName_input,
+        CourseRoom_input,
+        CourseCredit_input,
+        CourseDate_input,
+        CourseTime_input,
+        button_container
+    });
+    auto renderer = Renderer(main_container, [&] {
+        return vbox({
+            text("Add Course") | bold | color(Color::Blue) | hcenter,
+            separator(),
+            hbox(text("Course ID:  "), CourseID_input->Render()) | hcenter,
+            hbox(text("Course Name:  "), CourseName_input->Render()) | hcenter,
+            hbox(text("Course Room:  "), CourseRoom_input->Render()) | hcenter,
+            hbox(text("Course Credit:  "), CourseCredit_input->Render()) | hcenter,
+            hbox(text("Course Date:  "), CourseDate_input->Render()) | hcenter,
+            hbox(text("Course Time:  "), CourseTime_input->Render()) | hcenter,
+            separator(),
+            hbox({
+                submit_button->Render(),
+                text(" "),
+                cancel_button->Render()
+            }) | hcenter,
+            filler(),
+            text(error_message) | color(Color::Red) | hcenter,
+            text("Press esc to quit") | color(Color::GrayDark) | hcenter
+        }) | border;
+    });
+    auto event_handler = CatchEvent(renderer, [&](Event event) {
+        if (event == Event::Escape) {
+            screen.ExitLoopClosure()();
+            return true;
+        }
+        return false;
+    });
+    screen.Loop(event_handler);
+    system("cls");
     login();
+}
+
+void Management_student_records() {
+    system("cls");
+    auto screen = ScreenInteractive::TerminalOutput();
+
+    std::vector<std::string> entries = {
+        "Create an account",
+        "Edit an account",
+        "Delete an account",
+    };
+    int selected = 0;
+    auto menu = Menu(&entries, &selected);
+
+    auto renderer = Renderer(menu, [&] {
+        return vbox({
+            text("Management Student Records") | bold | color(Color::Blue) | hcenter,
+            separator(),
+            menu->Render(),
+            filler(),
+            text("Press esc to quit") | color(Color::GrayDark) | hcenter,
+        }) | border;
+    });
+
+    auto event_handler = CatchEvent(renderer, [&](Event event) {
+        if (event == Event::Escape) {
+            screen.ExitLoopClosure()();
+            return true;
+        }
+        return false;
+    });
+
+    screen.Loop(event_handler);
+    system("cls");
+    login();
+}
+
+int main () {
+    Management_student_records();
 }
