@@ -39,8 +39,6 @@ void manage_courses();
 void manage_student_records();
 void account_find(string account);
 string check_pass(string pass);
-void loading_screen();
-void loading();
 
 void Name_modify(string s) {
     int length = s.length();
@@ -95,90 +93,6 @@ void logout() {
     ID = "";
     Name = "";
     login();
-}
-
-void loading_screen() {
-    auto screen = ScreenInteractive::TerminalOutput();
-    bool should_quit = false;
-    int frame_count = 0;
-    float progress = 0.0f;
-    
-    vector<string> tasks = {
-        "Loading user data...",
-        "Initializing system...",
-        "Preparing interface...",
-        "Checking permissions...",
-        "Almost there..."
-    };
-    
-    auto title = text("Loading System") | bold | color(Color::Blue);
-    
-    auto container = Container::Vertical({});
-
-    auto renderer = Renderer(container, [&] {
-        vector<Element> elements;
-        elements.push_back(title | hcenter);
-        elements.push_back(separator());
-        
-        const char spinner[] = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏";
-        int spinner_index = frame_count % 10;
-        string spinner_str = string(1, spinner[spinner_index]);
-        
-        progress = (float)frame_count / 10.0f; 
-        if (progress > 1.0f) progress = 1.0f;
-        
-        // Current task
-        int task_index = (progress * tasks.size());
-        if (task_index >= tasks.size()) task_index = tasks.size() - 1;
-        
-        elements.push_back(vbox({
-            hbox({
-                text(spinner_str) | color(Color::Yellow),
-                text(" ") | bold,
-                text(tasks[task_index]) | color(Color::GrayDark)
-            }) | hcenter,
-            text("") | hcenter,
-            gauge(progress) | color(Color::Green) | hcenter,
-            text("") | hcenter,
-            text(to_string((int)(progress * 100)) + "%") | color(Color::Blue) | hcenter
-        }));
-        
-        elements.push_back(filler());
-        elements.push_back(text("Please wait while we prepare your workspace...") | color(Color::GrayDark) | hcenter);
-        
-        frame_count++;
-        if (frame_count >= 10) {
-            screen.ExitLoopClosure()();
-        }
-        
-        return vbox(elements) | border;
-    });
-
-    auto event_handler = CatchEvent(renderer, [&](Event event) {
-        if (event == Event::Character('q') || event == Event::Character('Q')) {
-            should_quit = true;
-            screen.ExitLoopClosure()();
-            return true;
-        }
-        return false;
-    });
-
-    auto animation_loop = [&]() {
-        while (frame_count < 10) { 
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            screen.PostEvent(Event::Custom);
-        }
-    };
-
-    std::thread animation_thread(animation_loop);
-    animation_thread.detach();
-
-    screen.Loop(event_handler);
-    if (admin_mode == true) {
-        menu_admin();
-    } else {
-        menu_student();
-    }
 }
 
 void login() {
@@ -256,13 +170,13 @@ void login() {
             }) | hcenter,
             filler(),
             text(error_message) | color(Color::Red) | hcenter,
-            text("Press Q to quit") | color(Color::GrayDark) | hcenter,
+            text("Press esc to quit") | color(Color::GrayDark) | hcenter,
         }) | border;
     });
 
 
     auto event_handler = CatchEvent(renderer, [&](Event event) {
-        if (event == Event::Character('q') || event == Event::Character('Q')) {
+        if (event == Event::Escape) {
             should_quit = true;
             screen.ExitLoopClosure()();
             return true;
@@ -275,8 +189,6 @@ void login() {
 
     if (login_success && !should_quit) {
         system("cls");
-        loading_screen();
-        std::this_thread::sleep_for(std::chrono::seconds(1));
         if (admin_mode == false) {
             menu_student();
         } else {
@@ -346,11 +258,11 @@ void register_page() {
             }) | hcenter,
             filler(),
             text(error_message) | color(Color::Red) | hcenter,
-            text("Press Q to quit") | color(Color::GrayDark) | hcenter
+            text("Press esc to quit") | color(Color::GrayDark) | hcenter
         }) | border;
     });
     auto event_handler = CatchEvent(renderer, [&](Event event) {
-        if (event == Event::Character('q') || event == Event::Character('Q')) {
+        if (event == Event::Escape) {
             screen.ExitLoopClosure()();
             return true;
         }
@@ -358,7 +270,6 @@ void register_page() {
     });
     screen.Loop(event_handler);
     system("cls");
-    loading();
     login();
 }
 
@@ -406,7 +317,7 @@ void menu_student() {
             separator(),
             menu->Render(),
             filler(),
-            text("Press Q to quit") | color(Color::GrayDark) | hcenter,
+            text("Press esc to quit") | color(Color::GrayDark) | hcenter,
         }) | border;
     });
 
@@ -417,7 +328,7 @@ void menu_student() {
             screen.ExitLoopClosure()();
             return true;
         }
-        if (event == Event::Character('q') || event == Event::Character('Q')) {
+        if (event == Event::Escape) {
             should_quit = true;
             screen.ExitLoopClosure()();
             return true;
@@ -430,9 +341,9 @@ void menu_student() {
     if (next_page) {
         system("cls"); 
         switch (next_page_index) {
-            case 0: loading(); course_history(); break;
-            case 1: loading(); timetable(); break;
-            case 2: loading(); course_registration(); break;
+            case 0: course_history(); break;
+            case 1: timetable(); break;
+            case 2: course_registration(); break;
             case 3: change_password(); break;
             case 4: {
                 system("cls");
@@ -487,7 +398,7 @@ void menu_admin() {
             separator(),
             menu->Render(),
             filler(),
-            text("Press Q to quit") | color(Color::GrayDark) | hcenter,
+            text("Press esc to quit") | color(Color::GrayDark) | hcenter,
         }) | border;
     });
 
@@ -498,7 +409,7 @@ void menu_admin() {
             screen.ExitLoopClosure()();
             return true;
         }
-        if (event == Event::Character('q') || event == Event::Character('Q')) {
+        if (event == Event::Escape) {
             should_quit = true;
             screen.ExitLoopClosure()();
             return true;
@@ -511,8 +422,8 @@ void menu_admin() {
     if (next_page) {
         system("cls"); 
         switch(next_page_index) {
-            case 0: loading(); manage_student_records();   break;
-            case 1: loading(); manage_courses();           break;
+            case 0: manage_student_records();   break;
+            case 1: manage_courses();           break;
             case 2: change_password();          break;
             case 3: { 
                 admin_mode = false; 
@@ -539,12 +450,12 @@ void course_history() {
             separator(),
             text("No course history available.") | hcenter,
             filler(),
-            text("Press Q to return") | color(Color::GrayDark) | hcenter,
+            text("Press esc to return") | color(Color::GrayDark) | hcenter,
         }) | border;
     });
 
     auto event_handler = CatchEvent(renderer, [&](Event event) {
-        if (event == Event::Character('q') || event == Event::Character('Q')) {
+        if (event == Event::Escape) {
             screen.ExitLoopClosure()();
             return true;
         }
@@ -553,7 +464,6 @@ void course_history() {
 
     screen.Loop(event_handler);
     system("cls");
-    loading();
     menu_student();
 }
 
@@ -572,12 +482,12 @@ void timetable() {
             separator(),
             text("No timetable available.") | hcenter,
             filler(),
-            text("Press Q to return") | color(Color::GrayDark) | hcenter,
+            text("Press esc to return") | color(Color::GrayDark) | hcenter,
         }) | border;
     });
 
     auto event_handler = CatchEvent(renderer, [&](Event event) {
-        if (event == Event::Character('q') || event == Event::Character('Q')) {
+        if (event == Event::Escape) {
             screen.ExitLoopClosure()();
             return true;
         }
@@ -587,7 +497,6 @@ void timetable() {
     screen.Loop(event_handler);
     
     system("cls");
-    loading();
     menu_student();
 }
 
@@ -606,12 +515,12 @@ void course_registration() {
             separator(),
             text("Course registration is not open.") | hcenter,
             filler(),
-            text("Press Q to return") | color(Color::GrayDark) | hcenter,
+            text("Press esc to return") | color(Color::GrayDark) | hcenter,
         }) | border;
     });
 
     auto event_handler = CatchEvent(renderer, [&](Event event) {
-        if (event == Event::Character('q') || event == Event::Character('Q')) {
+        if (event == Event::Escape) {
             screen.ExitLoopClosure()();
             return true;
         }
@@ -620,7 +529,6 @@ void course_registration() {
 
     screen.Loop(event_handler);
     system("cls");
-    loading();
     menu_student();
 }
 
@@ -639,12 +547,12 @@ void manage_student_records() {
             separator(),
             text("No Management available.") | hcenter,
             filler(),
-            text("Press Q to return") | color(Color::GrayDark) | hcenter,
+            text("Press esc to return") | color(Color::GrayDark) | hcenter,
         }) | border;
     });
 
     auto event_handler = CatchEvent(renderer, [&](Event event) {
-        if (event == Event::Character('q') || event == Event::Character('Q')) {
+        if (event == Event::Escape) {
             screen.ExitLoopClosure()();
             return true;
         }
@@ -671,12 +579,12 @@ void manage_courses() {
             separator(),
             text("No management available.") | hcenter,
             filler(),
-            text("Press Q to return") | color(Color::GrayDark) | hcenter,
+            text("Press esc to return") | color(Color::GrayDark) | hcenter,
         }) | border;
     });
 
     auto event_handler = CatchEvent(renderer, [&](Event event) {
-        if (event == Event::Character('q') || event == Event::Character('Q')) {
+        if (event == Event::Escape) {
             screen.ExitLoopClosure()();
             return true;
         }
@@ -798,11 +706,11 @@ void change_password() {
       }) | hcenter,
       filler(),
       text(error_message) | color(Color::Red) | hcenter,
-      text("Press Q to quit") | color(Color::GrayDark) | hcenter
+      text("Press esc to quit") | color(Color::GrayDark) | hcenter
     }) | border;
   });
   auto event_handler = CatchEvent(renderer, [&](Event event) {
-    if (event == Event::Character('q') || event == Event::Character('Q')) {
+    if (event == Event::Escape) {
       screen.ExitLoopClosure()();
       return true;
     }
@@ -812,7 +720,6 @@ void change_password() {
   
   if (password_changed) {
     system("cls");
-    loading();
     std::this_thread::sleep_for(std::chrono::seconds(1));
   }
   
@@ -870,51 +777,6 @@ string check_pass (string pass) {
             return "ok";
         }
     }
-}
-
-void loading() {
-    system("cls");
-    auto screen = ScreenInteractive::TerminalOutput();
-    int frame = 0;
-    
-    auto container = Container::Vertical({});
-    
-    auto renderer = Renderer(container, [&] {
-        return vbox({
-            text("Loading...") | bold | color(Color::Blue) | hcenter,
-            separator(),
-            hbox({
-                spinner(1, frame) | color(Color::Yellow),
-                text(" ") | bold,
-                text("Processing") | color(Color::GrayDark)
-            }) | hcenter,
-            filler()
-        }) | border;
-    });
-
-    auto event_handler = CatchEvent(renderer, [&](Event event) {
-        if (event == Event::Custom) {
-            frame++;
-            if (frame >= 10) {
-                screen.ExitLoopClosure()();
-            }
-            return true;
-        }
-        return false;
-    });
-
-    auto animation_loop = [&]() {
-        while (frame < 10) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            screen.PostEvent(Event::Custom);
-        }
-    };
-
-    std::thread animation_thread(animation_loop);
-    animation_thread.detach();
-
-    screen.Loop(event_handler);
-    return;
 }
 
 int main () {
