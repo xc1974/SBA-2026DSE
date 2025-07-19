@@ -36,7 +36,6 @@ void change_password();
 void logout();
 void menu_admin();
 void manage_courses();
-void manage_student_records();
 void account_find(string account);
 string check_pass(string pass);
 void Add_course();
@@ -426,7 +425,7 @@ void menu_admin() {
     if (next_page) {
         system("cls"); 
         switch(next_page_index) {
-            case 0: manage_student_records();   break;
+            case 0: Management_student_records();   break;
             case 1: manage_courses();           break;
             case 2: change_password();          break;
             case 3: { 
@@ -534,38 +533,6 @@ void course_registration() {
     screen.Loop(event_handler);
     system("cls");
     menu_student();
-}
-
-void manage_student_records() {
-    system("cls");
-    auto screen = ScreenInteractive::TerminalOutput();
-    bool should_quit = false;
-    
-    auto title = text("Manage Student Records") | bold | color(Color::Blue);
-    
-    auto container = Container::Vertical({});
-
-    auto renderer = Renderer(container, [&] {
-        return vbox({
-            title | hcenter,
-            separator(),
-            text("No Management available.") | hcenter,
-            filler(),
-            text("Press esc to return") | color(Color::GrayDark) | hcenter,
-        }) | border;
-    });
-
-    auto event_handler = CatchEvent(renderer, [&](Event event) {
-        if (event == Event::Escape) {
-            screen.ExitLoopClosure()();
-            return true;
-        }
-        return false;
-    });
-
-    screen.Loop(event_handler);
-    system("cls");
-    menu_admin();
 }
 
 void manage_courses() {
@@ -857,6 +824,9 @@ void Add_course() {
 void Management_student_records() {
     system("cls");
     auto screen = ScreenInteractive::TerminalOutput();
+    bool should_quit = false;
+    bool next_page = false;
+    int next_page_index = -1;
 
     std::vector<std::string> entries = {
         "Create an account",
@@ -877,7 +847,14 @@ void Management_student_records() {
     });
 
     auto event_handler = CatchEvent(renderer, [&](Event event) {
+        if (event == Event::Return) {
+            next_page = true;
+            next_page_index = selected;
+            screen.ExitLoopClosure()();
+            return true;
+        }
         if (event == Event::Escape) {
+            should_quit = true;
             screen.ExitLoopClosure()();
             return true;
         }
@@ -885,8 +862,18 @@ void Management_student_records() {
     });
 
     screen.Loop(event_handler);
+
+    if (next_page) {
+        system("cls"); 
+        switch(next_page_index) {
+            case 0: Create_account();   break;
+            case 1: /* Edit account function - not implemented yet */ break;
+            case 2: Delete_account();   break;
+        }
+    }
+    
     system("cls");
-    login();
+    menu_admin();
 }
 
 void Create_account() {
@@ -957,7 +944,7 @@ void Create_account() {
     });
     screen.Loop(event_handler);
     system("cls");
-    login();
+    menu_admin();
 }
 
 void Delete_account() {
@@ -1011,7 +998,7 @@ void Delete_account() {
     });
     screen.Loop(event_handler);
     system("cls");
-    login();
+    menu_admin();
 }
 
 int main () {
