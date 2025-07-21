@@ -1,3 +1,25 @@
+// This is a course registration system for a university.
+// It allows students to register for courses, view their course history, and view their timetable.
+// It also allows administrators to manage courses and student records.
+// It is built using the FTXUI library for the user interface.
+// It is a console application that runs on Windows only.
+// I use AI to help me Debug the cmakelist.txt and the main.cpp file (mainly the UI functions since I am not familiar with the FTXUI library)
+// Also the explanation of the code is in the main.cpp file write by AI.
+
+// =====================
+// main.cpp Structure
+// =====================
+// 1. Include headers and using namespace
+// 2. Global variables and function declarations
+// 3. Utility functions (e.g., Name_modify, pass_check, check_pass)
+// 4. Authentication and account management (login, register, change password, logout)
+// 5. Student menu and features (course history, timetable, course registration)
+// 6. Admin menu and features (manage courses, manage student records)
+// 7. Account operations (create, edit, delete account)
+// 8. Main function (program entry point)
+// =====================
+
+// headers
 #include <iostream>
 #include <string>
 #include <sstream>
@@ -21,10 +43,12 @@
 using namespace ftxui;
 using namespace std;
 
+// Global variable
 bool admin_mode = false;
 string ID = "";
 string Name = "";
 
+// calling function
 void new_password(string ID, string password, string Name);
 void register_page();
 void login();
@@ -42,7 +66,9 @@ void Add_course();
 void Management_student_records();
 void Create_account();
 void Delete_account();
+void Edit_account();
 
+//name modify function (to avoid the seperation between first name and last name)
 void Name_modify(string s) {
     int length = s.length();
     for (int i = 0; i < length; i++) {
@@ -53,6 +79,7 @@ void Name_modify(string s) {
     Name = s;
 }
 
+//password check function
 bool pass_check(string student_acc, string password) {
     ifstream student("student.txt");
     string line;
@@ -90,7 +117,7 @@ bool pass_check(string student_acc, string password) {
     return false; 
 }
 
-
+//logout function
 void logout() {
     system("cls"); 
     ID = "";
@@ -98,6 +125,7 @@ void logout() {
     login();
 }
 
+//login function
 void login() {
     system("cls"); 
     auto screen = ScreenInteractive::TerminalOutput();
@@ -200,6 +228,7 @@ void login() {
     }
 }
 
+//register function (might be deketed in the future)
 void register_page() {
     system("cls");
     auto screen = ScreenInteractive::TerminalOutput();
@@ -276,7 +305,7 @@ void register_page() {
     login();
 }
 
-
+//student menu function
 void menu_student() {
     system("cls");
     auto screen = ScreenInteractive::TerminalOutput();
@@ -359,6 +388,7 @@ void menu_student() {
     }
 }
 
+//admin menu function
 void menu_admin() {
     system("cls");
     auto screen = ScreenInteractive::TerminalOutput();
@@ -438,6 +468,7 @@ void menu_admin() {
     }
 }
 
+//student's course history function
 void course_history() {
     system("cls");  
     auto screen = ScreenInteractive::TerminalOutput();
@@ -470,6 +501,7 @@ void course_history() {
     menu_student();
 }
 
+//student's timetable function
 void timetable() {
     system("cls");
     auto screen = ScreenInteractive::TerminalOutput();
@@ -503,6 +535,7 @@ void timetable() {
     menu_student();
 }
 
+//student's course registration function
 void course_registration() {
     system("cls");
     auto screen = ScreenInteractive::TerminalOutput();
@@ -535,6 +568,7 @@ void course_registration() {
     menu_student();
 }
 
+//admin's manage courses function
 void manage_courses() {
     system("cls");
     auto screen = ScreenInteractive::TerminalOutput();
@@ -567,6 +601,7 @@ void manage_courses() {
     menu_admin();
 }
 
+//password check function
 bool check_password(string oldpassword, string newpassword) {
     string fileID, filePassword, fileusername;
     vector<string> records;
@@ -618,6 +653,7 @@ bool check_password(string oldpassword, string newpassword) {
     return false;
 }
 
+//change password function
 void change_password() {
   system("cls");
   auto screen = ScreenInteractive::TerminalOutput();
@@ -702,6 +738,7 @@ void change_password() {
   }
 }
 
+//new password function
 void new_password(string ID, string password, string Name) {
     vector<string> records;
     string line;
@@ -724,6 +761,7 @@ void new_password(string ID, string password, string Name) {
     studentOut.close();
 }
 
+//password check function
 string check_pass (string pass) {
     if (pass.size() < 8) {
         return "Your password should consist at least 8 characters long";
@@ -752,6 +790,7 @@ string check_pass (string pass) {
 
 // Stage two
 
+//add course function
 void Add_course() {
     system("cls");
     auto screen = ScreenInteractive::TerminalOutput();
@@ -821,6 +860,7 @@ void Add_course() {
     login();
 }
 
+//admin's manage student records function
 void Management_student_records() {
     system("cls");
     auto screen = ScreenInteractive::TerminalOutput();
@@ -828,7 +868,7 @@ void Management_student_records() {
     bool next_page = false;
     int next_page_index = -1;
 
-    std::vector<std::string> entries = {
+    vector<string> entries = {
         "Create an account",
         "Edit an account",
         "Delete an account",
@@ -867,7 +907,7 @@ void Management_student_records() {
         system("cls"); 
         switch(next_page_index) {
             case 0: Create_account();   break;
-            case 1: /* Edit account function - not implemented yet */ break;
+            case 1: Edit_account(); break;
             case 2: Delete_account();   break;
         }
     }
@@ -876,30 +916,36 @@ void Management_student_records() {
     menu_admin();
 }
 
+
 void Create_account() {
     system("cls");
     auto screen = ScreenInteractive::TerminalOutput();
-    string ID, Name, Password, Confirm_Password;
-    InputOption opt;
-    auto ID_input = Input(&ID, "ID", opt);
-    auto Name_input = Input(&Name, "Name", opt);
-    auto Password_input = Input(&Password, "Password", opt);
-    auto Confirm_Password_input = Input(&Confirm_Password, "Confirm Password", opt);
+    string ID, new_pw, verify_pw, Name;
+    InputOption opt; opt.password = true;
+    InputOption name_opt; 
+    auto old_input = Input(&ID,"ID", opt);
+    auto name_input = Input(&Name,"Name", name_opt);
+    auto new_input = Input(&new_pw,"password", opt);
+    auto ver_input = Input(&verify_pw,"Verify password", opt);
     string error_message;
+    bool password_changed = false;
     auto submit_button = Button("Submit", [&] {
-        if (ID.empty() || Name.empty() || Password.empty() || Confirm_Password.empty()) {
+        if (ID.empty() || new_pw.empty() || verify_pw.empty() || Name.empty()) {
             error_message = "All fields are required.";
             return;
-        }
-        if (Password != Confirm_Password) {
-            error_message = "Passwords do not match.";
+        } else if (new_pw != verify_pw) {
+            error_message = "Passwords do not match!";
             return;
+        } else {
+            if (check_pass(new_pw) != "ok") {
+                error_message = check_pass(new_pw);
+                return;
+            } else {
+                new_password(ID, new_pw, Name);
+            }
         }
-        if (check_pass(Password) != "ok") {
-            error_message = check_pass(Password);
-            return;
-        }
-        error_message = "Account created successfully! System will turn you back in 1 seconds.";
+        password_changed = true;
+        error_message = "Account registered successfully! System will turn you back in 1 seconds.";
         screen.ExitLoopClosure()();
     });
     auto cancel_button = Button("Cancel", [&] {
@@ -910,20 +956,20 @@ void Create_account() {
         cancel_button
     });
     auto main_container = Container::Vertical({
-        ID_input,   
-        Name_input,
-        Password_input,
-        Confirm_Password_input,
+        old_input,
+        name_input,
+        new_input,
+        ver_input,
         button_container
     });
     auto renderer = Renderer(main_container, [&] {
         return vbox({
-            text("Create an account") | bold | color(Color::Blue) | hcenter,
+            text("Create student account") | bold | color(Color::Blue) | hcenter,
             separator(),
-            hbox(text("ID:  "), ID_input->Render()) | hcenter,
-            hbox(text("Name:  "), Name_input->Render()) | hcenter,
-            hbox(text("Password:  "), Password_input->Render()) | hcenter,
-            hbox(text("Confirm Password:  "), Confirm_Password_input->Render()) | hcenter,
+            hbox(text("ID:  "), old_input->Render()) | hcenter,
+            hbox(text("Name:  "), name_input->Render()) | hcenter,
+            hbox(text("password:  "), new_input->Render()) | hcenter,
+            hbox(text("Verify password: "), ver_input->Render()) | hcenter,
             separator(),
             hbox({
                 submit_button->Render(),
@@ -947,60 +993,264 @@ void Create_account() {
     menu_admin();
 }
 
+//admin's edit account function
+void Edit_account() {
+    system("cls");
+    auto screen = ScreenInteractive::TerminalOutput();
+    string ID, Name, Password;
+    string old_Name, old_Password;
+    InputOption opt; opt.password = true;
+    InputOption name_opt;
+    bool found = false;
+    string error_message;
+    int tab_index = 0;
+
+    auto ID_input = Input(&ID, "Enter student ID", name_opt);
+    auto Name_input = Input(&Name, "New name (leave blank to keep)", name_opt);
+    auto Password_input = Input(&Password, "New password (leave blank to keep)", opt);
+
+    auto next_button = Button("Next", [&] {
+        if (ID.empty()) {
+            error_message = "Please enter ID.";
+            return;
+        }
+        ifstream fin("student.txt");
+        string fileID, filePassword, fileName;
+        found = false;
+        while (fin >> fileID >> filePassword >> fileName) {
+            if (fileID == ID) {
+                old_Name = fileName;
+                old_Password = filePassword;
+                found = true;
+                break;
+            }
+        }
+        fin.close();
+        if (!found) {
+            error_message = "ID not found.";
+            return;
+        }
+        Name = "";
+        Password = "";
+        error_message = string("Current name: ") + old_Name + ", password is hidden.";
+        tab_index = 1;
+        screen.PostEvent(Event::Custom);
+    });
+
+    auto submit_button = Button("Submit", [&] {
+        if (!found) {
+            error_message = "Please enter a valid ID first.";
+            return;
+        }
+        vector<tuple<string, string, string>> records;
+        ifstream fin("student.txt");
+        string fileID, filePassword, fileName;
+        while (fin >> fileID >> filePassword >> fileName) {
+            if (fileID == ID) {
+                string newName = Name.empty() ? old_Name : Name;
+                string newPassword = Password.empty() ? old_Password : Password;
+                records.push_back({fileID, newPassword, newName});
+            } else {
+                records.push_back({fileID, filePassword, fileName});
+            }
+        }
+        fin.close();
+        ofstream fout("student.txt");
+        for (auto& rec : records) {
+            fout << get<0>(rec) << " " << get<1>(rec) << " " << get<2>(rec) << endl;
+        }
+        fout.close();
+        error_message = "Account updated! Returning in 1 second.";
+        screen.ExitLoopClosure()();
+    });
+
+    auto cancel_button = Button("Cancel", [&] {
+        screen.ExitLoopClosure()();
+    });
+
+    auto id_container = Container::Vertical({
+        ID_input,
+        next_button,
+        cancel_button
+    });
+
+    auto edit_container = Container::Vertical({
+        Name_input,
+        Password_input,
+        submit_button,
+        cancel_button
+    });
+
+    auto main_container = Container::Tab(
+        {id_container, edit_container},
+        &tab_index
+    );
+
+    auto renderer = Renderer(main_container, [&] {
+        if (tab_index == 0) {
+            return vbox({
+                text("Edit Account - Finding ID") | bold | color(Color::Blue) | hcenter,
+                separator(),
+                hbox(text("ID:  "), ID_input->Render()) | hcenter,
+                hbox(next_button->Render(), text(" "), cancel_button->Render()) | hcenter,
+                filler(),
+                text(error_message) | color(Color::Red) | hcenter,
+                text("Press esc to quit") | color(Color::GrayDark) | hcenter
+            }) | border;
+        } else {
+            return vbox({
+                text("Edit Account - Update Info") | bold | color(Color::Blue) | hcenter,
+                separator(),
+                text(string("Current name: ") + old_Name) | hcenter,
+                hbox(text("New name:  "), Name_input->Render()) | hcenter,
+                hbox(text("New password:  "), Password_input->Render()) | hcenter,
+                hbox(submit_button->Render(), text(" "), cancel_button->Render()) | hcenter,
+                filler(),
+                text(error_message) | color(Color::Red) | hcenter,
+                text("Press esc to quit") | color(Color::GrayDark) | hcenter
+            }) | border;
+        }
+    });
+
+    auto event_handler = CatchEvent(renderer, [&](Event event) {
+        if (event == Event::Escape) {
+            screen.ExitLoopClosure()();
+            return true;
+        }
+        return false;
+    });
+
+    screen.Loop(event_handler);
+    system("cls");
+    menu_admin();
+}
+
+//admin's delete account function (to delete the account)
 void Delete_account() {
     system("cls");
     auto screen = ScreenInteractive::TerminalOutput();
     string ID;
     InputOption opt;
-    auto ID_input = Input(&ID, "ID", opt); 
+    auto ID_input = Input(&ID, "Enter student ID", opt);
     string error_message;
-    auto submit_button = Button("Submit", [&] {
+    bool found = false;
+    int tab_index = 0; // 0: input ID, 1: confirm
+    string found_name; // Save the found name
+    bool should_return = false;
+
+    auto submit_button = Button("Next", [&] {
         if (ID.empty()) {
-            error_message = "All fields are required.";
+            error_message = "Please enter ID.";
             return;
-        } 
-        error_message = "Account deleted successfully! System will turn you back in 1 seconds.";
+        }
+        // Check if ID exists
+        ifstream fin("student.txt");
+        string fileID, filePassword, fileName;
+        found = false;
+        while (fin >> fileID >> filePassword >> fileName) {
+            if (fileID == ID) {
+                found = true;
+                found_name = fileName;
+                break;
+            }
+        }
+        fin.close();
+        if (!found) {
+            error_message = "ID not found.";
+            return;
+        }
+        error_message = "Are you sure you want to delete this account?";
+        tab_index = 1;
+        screen.PostEvent(Event::Custom);
+    });
+
+    auto confirm_button = Button("Confirm", [&] {
+        // Delete the account
+        vector<tuple<string, string, string>> records;
+        ifstream fin("student.txt");
+        string fileID, filePassword, fileName;
+        while (fin >> fileID >> filePassword >> fileName) {
+            if (fileID != ID) {
+                records.push_back({fileID, filePassword, fileName});
+            }
+        }
+        fin.close();
+        ofstream fout("student.txt");
+        for (auto& rec : records) {
+            fout << get<0>(rec) << " " << get<1>(rec) << " " << get<2>(rec) << endl;
+        }
+        fout.close();
+        error_message = "Account deleted! Returning in 1 second.";
         screen.ExitLoopClosure()();
     });
-    auto cancel_button = Button("Cancel", [&] {
+
+    auto cancel_button_1 = Button("Cancel", [&] {
+        should_return = true;
         screen.ExitLoopClosure()();
     });
-    auto button_container = Container::Horizontal({
-        submit_button,
-        cancel_button
+    auto cancel_button_2 = Button("Cancel", [&] {
+        should_return = true;
+        screen.ExitLoopClosure()();
     });
-    auto main_container = Container::Vertical({
+
+    auto id_container = Container::Vertical({
         ID_input,
-        button_container
+        submit_button,
+        cancel_button_1
     });
+
+    auto confirm_container = Container::Vertical({
+        confirm_button,
+        cancel_button_2
+    });
+
+    auto main_container = Container::Tab(
+        {id_container, confirm_container},
+        &tab_index
+    );
+
     auto renderer = Renderer(main_container, [&] {
-        return vbox({
-            text("Delete an account") | bold | color(Color::Blue) | hcenter,
-            separator(),
-            hbox(text("ID:  "), ID_input->Render()) | hcenter,
-            separator(),
-            hbox({
-                submit_button->Render(),
-                text(" "),
-                cancel_button->Render()
-            }) | hcenter,
-            filler(),
-            text(error_message) | color(Color::Red) | hcenter,
-            text("Press esc to quit") | color(Color::GrayDark) | hcenter
-        }) | border;
+        if (tab_index == 0) {
+            return vbox({
+                text("Delete Account - Enter ID") | bold | color(Color::Blue) | hcenter,
+                separator(),
+                hbox(text("ID:  "), ID_input->Render()) | hcenter,
+                hbox(submit_button->Render(), text(" "), cancel_button_1->Render()) | hcenter,
+                filler(),
+                text(error_message) | color(Color::Red) | hcenter,
+                text("Press esc to quit") | color(Color::GrayDark) | hcenter
+            }) | border;
+        } else {
+            return vbox({
+                text("Delete Account - Confirm") | bold | color(Color::Blue) | hcenter,
+                separator(),
+                text("Are you sure you want to delete this account?") | color(Color::Red) | hcenter,
+                hbox(text("ID: "), text(ID) | color(Color::Blue)) | hcenter,
+                hbox(text("Name: "), text(found_name) | color(Color::Blue)) | hcenter,
+                hbox(confirm_button->Render(), text(" "), cancel_button_2->Render()) | hcenter,
+                filler(),
+                text(error_message) | color(Color::Red) | hcenter,
+                text("Press esc to quit") | color(Color::GrayDark) | hcenter
+            }) | border;
+        }
     });
+
     auto event_handler = CatchEvent(renderer, [&](Event event) {
         if (event == Event::Escape) {
+            should_return = true;
             screen.ExitLoopClosure()();
             return true;
         }
         return false;
     });
+
     screen.Loop(event_handler);
     system("cls");
+    if (should_return) return;
     menu_admin();
 }
 
+//main function
 int main () {
     login();
 }
