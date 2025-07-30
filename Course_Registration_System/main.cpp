@@ -67,6 +67,9 @@ void Management_student_records();
 void Create_account();
 void Delete_account();
 void Edit_account();
+void Create_course() {}
+void Edit_course() {}
+void Delete_course() {}
 
 //name modify function (to avoid the seperation between first name and last name)
 void Name_modify(string s) {
@@ -573,23 +576,56 @@ void manage_courses() {
     system("cls");
     auto screen = ScreenInteractive::TerminalOutput();
     bool should_quit = false;
+    bool next_page = false;
+    int next_page_index = -1;
     
-    auto title = text("manage courses") | bold | color(Color::Blue);
+    auto title = text("Course Registration System") | bold | color(Color::Blue);
     
-    auto container = Container::Vertical({});
+    auto student_info = vbox({
+        hbox({
+            text("Student ID: ") | color(Color::GrayDark),
+            text(ID) | color(Color::Blue)
+        }),
+        hbox({
+            text("Student Name: ") | color(Color::GrayDark),
+            text(Name) | color(Color::Blue)
+        })
+    });
 
-    auto renderer = Renderer(container, [&] {
+    vector<string> menu_entries = {
+        "Create a course",
+        "Edit a course",
+        "Delete a course", 
+    };
+    
+    int selected = 0;
+    auto menu = Menu(&menu_entries, &selected);
+
+    auto main_container = Container::Vertical({
+        menu
+    });
+
+    auto renderer = Renderer(main_container, [&] {
         return vbox({
             title | hcenter,
             separator(),
-            text("No management available.") | hcenter,
+            student_info | hcenter,
+            separator(),
+            menu->Render(),
             filler(),
-            text("Press esc to return") | color(Color::GrayDark) | hcenter,
+            text("Press esc to quit") | color(Color::GrayDark) | hcenter,
         }) | border;
     });
 
     auto event_handler = CatchEvent(renderer, [&](Event event) {
+        if (event == Event::Return) {
+            next_page = true;
+            next_page_index = selected;
+            screen.ExitLoopClosure()();
+            return true;
+        }
         if (event == Event::Escape) {
+            should_quit = true;
             screen.ExitLoopClosure()();
             return true;
         }
@@ -597,8 +633,21 @@ void manage_courses() {
     });
 
     screen.Loop(event_handler);
-    system("cls");
-    menu_admin();
+
+    if (should_quit) {
+        system("cls");
+        menu_admin();
+        return;
+    }
+
+    if (next_page) {
+        system("cls"); 
+        switch (next_page_index) {
+            case 0: Create_course(); break;
+            case 1: Edit_course(); break;
+            case 2: Delete_course(); break;
+        }
+    }
 }
 
 //password check function
@@ -786,6 +835,64 @@ string check_pass (string pass) {
             return "ok";
         }
     }
+}
+
+
+void startup_animation() {
+    system("cls");
+    auto screen = ScreenInteractive::TerminalOutput();
+
+    vector<string> ascii_art = {
+        "                                                                                                                                ",
+        "                                                                                                                                ",
+        "      +*  :#                               *#                         +:                            +*-                    +#.         .=.       ",
+        "  @@@@@@  #@@@@@#@@@@@@@@@@=    ..........+@@=..........             @@*                           .@@=                   *@@          %@%-@@:   ",
+        "     .@@  #@=   =@*      *@=   :##########@@@@##########=    .......@@@-.............       ++++++*@@@*++++++++=         *@@@@@@@@@    %@%  @@%  ",
+        "   @@@@@. @@@@@.-@@@@@@@@@@=      -@@@@@@@@@@@@@@@@@@%      @@@@@@@@@@@@@@@@@@@@@@@@@@      @@@@@@@@@@@@@@%##@@@        @@@@:   @@%---=@@%---+-  ",
+        "   @# :@- @: .@:-@@******@@=      +@@     :@@.     #@@            +@@.                      @@-              :@@      -@@+ -@@*#@@=@@@@@@@@@@@@= ",
+        "   @@%@@- @@%@@:-@*      *@=      +@@%%%%%@@@@%%%%%@@@           #@@       =@@              @@=              -@@     .@%     .@@@     *@@@@.     ",
+        "     #@  @@     -@@@@@@@@@@=              :@@.                  @@@        =@@              @@@@@@@@@@@@@@@@@@@@       #@@@@ @@@     :@@  @@-    ",
+        "    %@@@@@@@@@@--@*      *@=     .@@@@@@@@@@@@@@@@@@@@-       %@@@-  -+++++@@@#+++++.       @@-              :@@      :=   +@@+     *@@:   @@%   ",
+        "   @@@:  +@+    -@@@@@@@@@@=              :@@.      @@-     @@@@@@-  %@@@@@@@@@@@@@@+       @@-              :@@         @@@@      @@@      @@%  ",
+        "  @@@@@@@@@@@@@  .-@@=+@@..    @@@@@@@@@@@@@@@@@@@@@@@@@@.  %*  @@-        =@@              @@@@@@@@@@@@@@@@@@@@      #@@@+     :@@@:        @@* ",
+        "    @@   =@=      -@@ -@@                 :@@.      @@-         @@-        =@@              @@=              :@@                 -               ",
+        "    @@@@@@@@@@@   @@- -@@ :@=    +@@@@@@@@@@@@@@@@@@@@-         @@-        =@@              @@-              :@@        *@@   @@.   @@+   #@@    ",
+        "    @@*--%@%---  @@*  -@@ =@*             :@@.      **          @@-        =@@              @@@%%%%%%%%%%%%@@@@@       %@@    *@%    @@:   -@@+  ",
+        "    @@+.......*@@@.    @@@@@          *@@@@@@                   @@- @@@@@@@@@@@@@@@@@@      @@#..............*@@      @@*     =@@    +@@     @@* ",
+        "                                                                                                                                ",
+        "                                                                                                                                ",
+        "                                                                                                                                "
+    };
+
+    
+    auto art_box = vbox({
+        [&ascii_art] {
+            Elements lines;
+            for (const auto& line : ascii_art) {
+                lines.push_back(text(line) | hcenter);
+            }
+            return lines;
+        }()
+    });
+
+    auto title = text("Please maximize the window for better experience | 觀事在自然 | logging into the course editing system") | bold | color(Color::Blue) | hcenter;
+
+    auto renderer = Renderer([&] {
+        return vbox({
+            filler(),
+            art_box,
+            separator(),
+            title,
+            filler(),
+        }) | border;
+    });
+
+    screen.Post([&] {
+        std::this_thread::sleep_for(std::chrono::seconds(3));
+        screen.ExitLoopClosure()();
+    });
+    screen.Loop(renderer);
+    system("cls");
 }
 
 // Stage two
@@ -1252,5 +1359,5 @@ void Delete_account() {
 
 //main function
 int main () {
-    login();
+    startup_animation();
 }
