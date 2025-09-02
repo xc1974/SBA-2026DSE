@@ -19,7 +19,6 @@
 // 8. Main function (program entry point)
 // =====================
 
-// headers
 #include <iostream>
 #include <string>
 #include <sstream>
@@ -34,7 +33,6 @@
 #include <chrono>
 #include <thread>
 
-// FTXUI headers
 #include <ftxui/component/component.hpp>
 #include <ftxui/component/screen_interactive.hpp>
 #include <ftxui/dom/elements.hpp>
@@ -43,7 +41,6 @@
 using namespace ftxui;
 using namespace std;
 
-// Global variable
 bool admin_mode = false;
 string ID = "";
 string Name = "";
@@ -63,13 +60,17 @@ void manage_courses();
 void account_find(string account);
 string check_pass(string pass);
 void Add_course();
+void Edit_course();
+void Delete_course();
 void Management_student_records();
+void Management_course_records();
 void Create_account();
 void Delete_account();
 void Edit_account();
-void Create_course() {}
-void Edit_course() {}
-void Delete_course() {}
+void startup_animation();
+void write_in_course(string CourseID, string CourseName, string CourseRoom, string CourseCredit, string CourseDate, string CourseTime);
+void clash_timetable(string CourseID, string CourseName, string CourseRoom, string CourseCredit, string CourseDate, string CourseTime);
+void timetable();
 
 //name modify function (to avoid the seperation between first name and last name)
 void Name_modify(string s) {
@@ -459,7 +460,7 @@ void menu_admin() {
         system("cls"); 
         switch(next_page_index) {
             case 0: Management_student_records();   break;
-            case 1: manage_courses();           break;
+            case 1: startup_animation(); manage_courses(); break;
             case 2: change_password();          break;
             case 3: { 
                 admin_mode = false; 
@@ -504,73 +505,6 @@ void course_history() {
     menu_student();
 }
 
-//student's timetable function
-void timetable() {
-    system("cls");
-    auto screen = ScreenInteractive::TerminalOutput();
-    bool should_quit = false;
-    
-    auto title = text("Timetable") | bold | color(Color::Blue);
-    
-    auto container = Container::Vertical({});
-
-    auto renderer = Renderer(container, [&] {
-        return vbox({
-            title | hcenter,
-            separator(),
-            text("No timetable available.") | hcenter,
-            filler(),
-            text("Press esc to return") | color(Color::GrayDark) | hcenter,
-        }) | border;
-    });
-
-    auto event_handler = CatchEvent(renderer, [&](Event event) {
-        if (event == Event::Escape) {
-            screen.ExitLoopClosure()();
-            return true;
-        }
-        return false;
-    });
-
-    screen.Loop(event_handler);
-    
-    system("cls");
-    menu_student();
-}
-
-//student's course registration function
-void course_registration() {
-    system("cls");
-    auto screen = ScreenInteractive::TerminalOutput();
-    bool should_quit = false;
-    
-    auto title = text("Course Registration") | bold | color(Color::Blue);
-    
-    auto container = Container::Vertical({});
-
-    auto renderer = Renderer(container, [&] {
-        return vbox({
-            title | hcenter,
-            separator(),
-            text("Course registration is not open.") | hcenter,
-            filler(),
-            text("Press esc to return") | color(Color::GrayDark) | hcenter,
-        }) | border;
-    });
-
-    auto event_handler = CatchEvent(renderer, [&](Event event) {
-        if (event == Event::Escape) {
-            screen.ExitLoopClosure()();
-            return true;
-        }
-        return false;
-    });
-
-    screen.Loop(event_handler);
-    system("cls");
-    menu_student();
-}
-
 //admin's manage courses function
 void manage_courses() {
     system("cls");
@@ -596,6 +530,7 @@ void manage_courses() {
         "Create a course",
         "Edit a course",
         "Delete a course", 
+        "View timetable"
     };
     
     int selected = 0;
@@ -643,9 +578,10 @@ void manage_courses() {
     if (next_page) {
         system("cls"); 
         switch (next_page_index) {
-            case 0: Create_course(); break;
+            case 0: Add_course(); break;
             case 1: Edit_course(); break;
             case 2: Delete_course(); break;
+            case 3: timetable(); break;
         }
     }
 }
@@ -886,16 +822,539 @@ void startup_animation() {
             filler(),
         }) | border;
     });
-
-    screen.Post([&] {
+    std::thread([&screen] {
         std::this_thread::sleep_for(std::chrono::seconds(3));
         screen.ExitLoopClosure()();
-    });
+    }).detach();
+
     screen.Loop(renderer);
+    system("cls");
+    manage_courses();
+}
+
+
+//timetable function (use AI to generate but it is not in the requirement so plz dont ban me.)
+void timetable() {
+    system("cls");
+    auto screen = ScreenInteractive::TerminalOutput();
+    
+    vector<tuple<string, string, string, string, string, string>> courses;
+    ifstream fin("course.txt");
+    string courseID, courseName, courseRoom, courseCredit, courseDate, courseTime;
+    
+    while (getline(fin, courseID)) {
+        if (!courseID.empty()) {
+            getline(fin, courseName);
+            getline(fin, courseRoom);
+            getline(fin, courseCredit);
+            getline(fin, courseDate);
+            getline(fin, courseTime);
+            string empty_line;
+            getline(fin, empty_line);
+            courses.push_back({courseID, courseName, courseRoom, courseCredit, courseDate, courseTime});
+        }
+    }
+    fin.close();
+
+    vector<string> time_slots = {
+        "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
+        "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30",
+        "16:00", "16:30", "17:00", "17:30", "18:00", "18:30"
+    };
+    
+    vector<string> g_rooms = {"G001", "G002", "G003", "G004", "G005", "G006", "G007", "G008", "G009", "G010"};
+    vector<string> floor1_rooms = {"1001", "1002", "1003", "1004", "1005", "1006", "1007", "1008", "1009", "1010"};
+    vector<string> floor2_rooms = {"2001", "2002", "2003", "2004", "2005", "2006", "2007", "2008", "2009", "2010"};
+    vector<string> floor3_rooms = {"3001", "3002", "3003", "3004", "3005", "3006", "3007", "3008", "3009", "3010"};
+    vector<string> floor4_rooms = {"4001", "4002", "4003", "4004", "4005", "4006", "4007", "4008", "4009", "4010"};
+    
+    int current_floor = 0; // 0=G, 1=1st, 2=2nd, 3=3rd, 4=4th
+    vector<string> floor_names = {"G FLOOR", "1ST FLOOR", "2ND FLOOR", "3RD FLOOR", "4TH FLOOR"};
+    vector<vector<string>> all_rooms = {g_rooms, floor1_rooms, floor2_rooms, floor3_rooms, floor4_rooms};
+    
+    int current_day = 0; // 0=MON, 1=TUE, 2=WED, 3=THU, 4=FRI
+    vector<string> day_names = {"MON", "TUE", "WED", "THU", "FRI"};
+    
+    auto back_button = Button("Back", [&] {
+        screen.ExitLoopClosure()();
+    });
+
+    auto renderer = Renderer(back_button, [&] {
+        Elements timetable_content;
+        
+        timetable_content.push_back(text("TIMETABLE") | bold | color(Color::Blue) | hcenter);
+        timetable_content.push_back(separator());
+        
+        Elements floor_nav;
+        for (int i = 0; i < floor_names.size(); i++) {
+            if (i == current_floor) {
+                floor_nav.push_back(text("[" + floor_names[i] + "]") | color(Color::Yellow) | bold);
+            } else {
+                floor_nav.push_back(text(floor_names[i]) | color(Color::GrayDark));
+            }
+            if (i < floor_names.size() - 1) {
+                floor_nav.push_back(text(" | ") | color(Color::GrayDark));
+            }
+        }
+        timetable_content.push_back(hbox(floor_nav) | hcenter);
+        timetable_content.push_back(separator());
+        
+        Elements day_nav;
+        for (int i = 0; i < day_names.size(); i++) {
+            if (i == current_day) {
+                day_nav.push_back(text("[" + day_names[i] + "]") | color(Color::Green) | bold);
+            } else {
+                day_nav.push_back(text(day_names[i]) | color(Color::GrayDark));
+            }
+            if (i < day_names.size() - 1) {
+                day_nav.push_back(text(" | ") | color(Color::GrayDark));
+            }
+        }
+        timetable_content.push_back(hbox(day_nav) | hcenter);
+        timetable_content.push_back(separator());
+        
+        // Function to create timetable for current floor and day
+        auto create_floor_timetable = [&](const string& floor_name, const vector<string>& rooms, const string& day) {
+            Elements floor_content;
+            floor_content.push_back(text(floor_name + " - " + day) | bold | color(Color::Green) | hcenter);
+            floor_content.push_back(separator());
+            
+            Elements header_row;
+            header_row.push_back(text("Time") | color(Color::Yellow) | size(WIDTH, EQUAL, 8));
+            for (const auto& room : rooms) {
+                header_row.push_back(text(room) | color(Color::Yellow) | size(WIDTH, EQUAL, 12));
+            }
+            floor_content.push_back(hbox(header_row) | hcenter);
+            floor_content.push_back(separator());
+            
+            for (const auto& time : time_slots) {
+                Elements time_row;
+                time_row.push_back(text(time) | color(Color::Cyan) | size(WIDTH, EQUAL, 8));
+                
+                for (const auto& room : rooms) {
+                    string cell_content = "";
+                    bool is_occupied = false;
+                    string course_id = "";
+                    
+                    for (const auto& course : courses) {
+                        string course_room = get<2>(course);
+                        string course_time = get<5>(course);
+                        string course_date = get<4>(course);
+                        
+                        if (course_room == room) {
+                            bool day_match = false;
+                            if (course_date.find(day) != string::npos) {
+                                day_match = true;
+                            }
+                            
+                            if (day_match) {
+                                string course_start_time = course_time;
+                                string course_end_time = "";
+                                
+                                int start_hour = stoi(course_start_time.substr(0, 2));
+                                int start_minute = stoi(course_start_time.substr(3, 2));
+                                
+                                int end_hour = start_hour + 2;
+                                int end_minute = start_minute;
+                                
+                                if (end_hour >= 24) {
+                                    end_hour -= 24;
+                                }
+                                
+                                char end_time_str[6];
+                                sprintf(end_time_str, "%02d:%02d", end_hour, end_minute);
+                                course_end_time = string(end_time_str);
+                                
+                                if (time >= course_start_time && time < course_end_time) {
+                                    is_occupied = true;
+                                    course_id = get<0>(course);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    
+                    if (is_occupied) {
+                        int color_seed = 0;
+                        for (char c : course_id) {
+                            color_seed += (int)c;
+                        }
+                        color_seed = color_seed % 8; // 8 different colors
+                        
+                        Color bg_colors[] = {Color::Blue, Color::Green, Color::Yellow, 
+                                           Color::Magenta, Color::Cyan, Color::White, Color::GrayLight, Color::BlueLight};
+                        Color text_colors[] = {Color::White, Color::Black, Color::Black,
+                                             Color::White, Color::Black, Color::Black, Color::Black, Color::Black};
+                        
+                        time_row.push_back(text(course_id) | color(text_colors[color_seed]) | bgcolor(bg_colors[color_seed]) | size(WIDTH, EQUAL, 12));
+                    } else {
+                        time_row.push_back(text("---") | color(Color::GrayDark) | size(WIDTH, EQUAL, 12));
+                    }
+                }
+                floor_content.push_back(hbox(time_row) | hcenter);
+            }
+            
+            return floor_content;
+        };
+        
+        if (courses.empty()) {
+            timetable_content.push_back(text("No courses scheduled.") | color(Color::Red) | hcenter);
+        } else {
+            auto current_floor_content = create_floor_timetable(floor_names[current_floor], all_rooms[current_floor], day_names[current_day]);
+            timetable_content.insert(timetable_content.end(), current_floor_content.begin(), current_floor_content.end());
+        }
+        
+        timetable_content.push_back(separator());
+        timetable_content.push_back(text("Navigation: ????Arrow Keys (Floor) | ????Arrow Keys (Day) | ESC: Quit") | color(Color::GrayDark) | hcenter);
+        timetable_content.push_back(back_button->Render() | hcenter);
+        
+        return vbox(timetable_content) | border;
+    });
+
+    auto event_handler = CatchEvent(renderer, [&](Event event) {
+        if (event == Event::Escape) {
+            screen.ExitLoopClosure()();
+            return true;
+        }
+        if (event == Event::ArrowLeft) {
+            current_floor = (current_floor - 1 + 5) % 5; // Wrap around
+            return true;
+        }
+        if (event == Event::ArrowRight) {
+            current_floor = (current_floor + 1) % 5; // Wrap around
+            return true;
+        }
+        if (event == Event::ArrowUp) {
+            current_day = (current_day - 1 + 5) % 5; // Wrap around
+            return true;
+        }
+        if (event == Event::ArrowDown) {
+            current_day = (current_day + 1) % 5; // Wrap around
+            return true;
+        }
+        return false;
+    });
+
+    screen.Loop(event_handler);
+    system("cls");
+    menu_admin();
+}
+
+//student's course registration function
+void course_registration() {
+    system("cls");
+    auto screen = ScreenInteractive::TerminalOutput();
+    bool should_quit = false;
+    
+    auto title = text("Course Registration") | bold | color(Color::Blue);
+    
+    auto container = Container::Vertical({});
+
+    auto renderer = Renderer(container, [&] {
+        return vbox({
+            title | hcenter,
+            separator(),
+            text("Course registration is not open.") | hcenter,
+            filler(),
+            text("Press esc to return") | color(Color::GrayDark) | hcenter,
+        }) | border;
+    });
+
+    auto event_handler = CatchEvent(renderer, [&](Event event) {
+        if (event == Event::Escape) {
+            screen.ExitLoopClosure()();
+            return true;
+        }
+        return false;
+    });
+
+    screen.Loop(event_handler);
+    system("cls");
+    menu_student();
+}
+
+bool course_exists(string CourseID) {
+    ifstream course("course.txt");
+    string line;
+    while (getline(course, line)) {
+        if (line == CourseID) {
+            course.close();
+            return true;
+        }
+        for (int i = 0; i < 6; i++) {
+            getline(course, line);
+        }
+    }
+    course.close();
+    return false;
+}
+    
+//write in course function
+void write_in_course(string CourseID, string CourseName, string CourseRoom, string CourseCredit, string CourseDate, string CourseTime) {
+    ofstream course("course.txt", ios::app);
+    course << CourseID << endl;
+    course << CourseName << endl;
+    course << CourseRoom << endl;
+    course << CourseCredit << endl;
+    course << CourseDate << endl;
+    course << CourseTime << endl;
+    course << endl;
+    course.close();
+}
+
+//clash timetable function
+void clash_timetable(string CourseID, string CourseName, string CourseRoom, string CourseCredit, string CourseDate, string CourseTime) {
+    system("cls");
+    auto clash_screen = ScreenInteractive::TerminalOutput();
+    
+    vector<tuple<string, string, string, string, string, string>> courses;
+    ifstream fin("course.txt");
+    string courseID, courseName, courseRoom, courseCredit, courseDate, courseTime;
+    
+    while (getline(fin, courseID)) {
+        if (!courseID.empty()) {
+            getline(fin, courseName);
+            getline(fin, courseRoom);
+            getline(fin, courseCredit);
+            getline(fin, courseDate);
+            getline(fin, courseTime);
+            string empty_line;
+            getline(fin, empty_line);
+            courses.push_back({courseID, courseName, courseRoom, courseCredit, courseDate, courseTime});
+        }
+    }
+    fin.close();
+    
+    courses.push_back({CourseID, CourseName, CourseRoom, CourseCredit, CourseDate, CourseTime});
+    
+    string floor_name = "UNKNOWN FLOOR";
+    vector<string> floor_rooms;
+    if (CourseRoom[0] == 'G') {
+        floor_name = "G FLOOR";
+        floor_rooms = {"G001", "G002", "G003", "G004", "G005", "G006", "G007", "G008", "G009", "G010"};
+    } else if (CourseRoom[0] == '1') {
+        floor_name = "1ST FLOOR";
+        floor_rooms = {"1001", "1002", "1003", "1004", "1005", "1006", "1007", "1008", "1009", "1010"};
+    } else if (CourseRoom[0] == '2') {
+        floor_name = "2ND FLOOR";
+        floor_rooms = {"2001", "2002", "2003", "2004", "2005", "2006", "2007", "2008", "2009", "2010"};
+    } else if (CourseRoom[0] == '3') {
+        floor_name = "3RD FLOOR";
+        floor_rooms = {"3001", "3002", "3003", "3004", "3005", "3006", "3007", "3008", "3009", "3010"};
+    } else if (CourseRoom[0] == '4') {
+        floor_name = "4TH FLOOR";
+        floor_rooms = {"4001", "4002", "4003", "4004", "4005", "4006", "4007", "4008", "4009", "4010"};
+    }
+    
+    vector<string> time_slots = {
+        "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
+        "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30",
+        "16:00", "16:30", "17:00", "17:30", "18:00", "18:30"
+    };
+    
+    auto renderer = Renderer([&] {
+        Elements clash_content;
+        
+        clash_content.push_back(text("TIMETABLE CLASH DETECTED!") | bold | color(Color::Red) | hcenter);
+        clash_content.push_back(separator());
+        clash_content.push_back(text("Conflicting courses are marked in RED") | color(Color::Red) | hcenter);
+        clash_content.push_back(separator());
+        
+        clash_content.push_back(text(floor_name) | bold | color(Color::Green) | hcenter);
+        clash_content.push_back(separator());
+        
+        Elements header_row;
+        header_row.push_back(text("Time") | color(Color::Yellow) | size(WIDTH, EQUAL, 8));
+        for (const auto& room : floor_rooms) {
+            header_row.push_back(text(room) | color(Color::Yellow) | size(WIDTH, EQUAL, 12));
+        }
+        clash_content.push_back(hbox(header_row) | hcenter);
+        clash_content.push_back(separator());
+        
+        for (const auto& time : time_slots) {
+            Elements time_row;
+            time_row.push_back(text(time) | color(Color::Cyan) | size(WIDTH, EQUAL, 8));
+            
+            for (const auto& room : floor_rooms) {
+                string cell_content = "";
+                bool is_clash = false;
+                
+                for (const auto& course : courses) {
+                    string course_room = get<2>(course);
+                    string course_time = get<5>(course);
+                    string course_date = get<4>(course);
+                    
+                    if (course_room == room) {
+                        bool day_match = false;
+                        if (course_date.find(CourseDate) != string::npos) {
+                            day_match = true;
+                        }
+                        
+                        if (day_match) {
+                            string course_start_time = course_time;
+                            
+                            int start_hour = stoi(course_start_time.substr(0, 2));
+                            int start_minute = stoi(course_start_time.substr(3, 2));
+                            
+                            int end_hour = start_hour + 2;
+                            int end_minute = start_minute;
+                            
+                            if (end_hour >= 24) {
+                                end_hour -= 24;
+                            }
+                            
+                            char end_time_str[6];
+                            sprintf(end_time_str, "%02d:%02d", end_hour, end_minute);
+                            string course_end_time = string(end_time_str);
+                            
+                            if (time >= course_start_time && time < course_end_time) {
+                                cell_content = get<0>(course);
+                                if (course_room == CourseRoom) {
+                                    bool day_overlap = false;
+                                    if (course_date.find(CourseDate) != string::npos && CourseDate.find(CourseDate) != string::npos) {
+                                        day_overlap = true;
+                                    }
+                                    
+                                    if (day_overlap) {
+                                        string new_start = CourseTime;
+                                        int new_hour = stoi(new_start.substr(0, 2));
+                                        int new_minute = stoi(new_start.substr(3, 2));
+                                        int new_end_hour = new_hour + 2;
+                                        if (new_end_hour >= 24) new_end_hour -= 24;
+                                        
+                                        if (!(new_end_hour <= start_hour || end_hour <= new_hour)) {
+                                            is_clash = true;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                if (CourseRoom == room && CourseDate.find(CourseDate) != string::npos) {
+                    string new_start = CourseTime;
+                    int new_hour = stoi(new_start.substr(0, 2));
+                    int new_minute = stoi(new_start.substr(3, 2));
+                    int new_end_hour = new_hour + 2;
+                    if (new_end_hour >= 24) new_end_hour -= 24;
+                    
+                    char new_end_time_str[6];
+                    sprintf(new_end_time_str, "%02d:%02d", new_end_hour, new_minute);
+                    string new_end_time = string(new_end_time_str);
+                    
+                    if (time >= CourseTime && time < new_end_time) {
+                        if (cell_content.empty()) {
+                            cell_content = CourseID;
+                            is_clash = true;
+                        } else {
+                            cell_content += "/" + CourseID;
+                            is_clash = true;
+                        }
+                    }
+                }
+                
+                if (is_clash) {
+                    time_row.push_back(text(cell_content) | color(Color::White) | bgcolor(Color::Red) | size(WIDTH, EQUAL, 12));
+                } else if (!cell_content.empty()) {
+                    time_row.push_back(text(cell_content) | color(Color::White) | bgcolor(Color::Blue) | size(WIDTH, EQUAL, 12));
+                } else {
+                    time_row.push_back(text("---") | color(Color::GrayDark) | size(WIDTH, EQUAL, 12));
+                }
+            }
+            clash_content.push_back(hbox(time_row) | hcenter);
+        }
+        
+        clash_content.push_back(separator());
+        clash_content.push_back(text("Press ESC to return to management") | color(Color::GrayDark) | hcenter);
+        
+        return vbox(clash_content) | border;
+    });
+    
+    auto event_handler = CatchEvent(renderer, [&](Event event) {
+        if (event == Event::Escape) {
+            clash_screen.ExitLoopClosure()();
+            return true;
+        }
+        return false;
+    });
+    
+    clash_screen.Loop(event_handler);
     system("cls");
 }
 
-// Stage two
+//clash test function
+bool clashtest(string CourseID, string CourseName, string CourseRoom, string CourseCredit, string CourseDate, string CourseTime) {
+    ifstream course("course.txt");
+    string courseID, courseName, courseRoom, courseCredit, courseDate, courseTime;
+    
+    while (getline(course, courseID)) {
+        if (!courseID.empty()) {
+            getline(course, courseName);
+            getline(course, courseRoom);
+            getline(course, courseCredit);
+            getline(course, courseDate);
+            getline(course, courseTime);
+            string empty_line;
+            getline(course, empty_line);
+            
+            if (courseRoom == CourseRoom) {
+                bool day_overlap = false;
+                
+                vector<string> new_days;
+                string new_date_copy = CourseDate;
+                size_t pos = 0;
+                while ((pos = new_date_copy.find(" ")) != string::npos) {
+                    new_days.push_back(new_date_copy.substr(0, pos));
+                    new_date_copy.erase(0, pos + 1);
+                }
+                new_days.push_back(new_date_copy);
+                
+                vector<string> existing_days;
+                string existing_date_copy = courseDate;
+                pos = 0;
+                while ((pos = existing_date_copy.find(" ")) != string::npos) {
+                    existing_days.push_back(existing_date_copy.substr(0, pos));
+                    existing_date_copy.erase(0, pos + 1);
+                }
+                existing_days.push_back(existing_date_copy);
+                
+                for (const auto& new_day : new_days) {
+                    for (const auto& existing_day : existing_days) {
+                        if (new_day == existing_day) {
+                            day_overlap = true;
+                            break;
+                        }
+                    }
+                    if (day_overlap) break;
+                }
+                
+                if (day_overlap) {
+                    string existing_start = courseTime;
+                    string new_start = CourseTime;
+                    
+                    int existing_hour = stoi(existing_start.substr(0, 2));
+                    int existing_minute = stoi(existing_start.substr(3, 2));
+                    int new_hour = stoi(new_start.substr(0, 2));
+                    int new_minute = stoi(new_start.substr(3, 2));
+                    
+                    int existing_end_hour = existing_hour + 2;
+                    int new_end_hour = new_hour + 2;
+                    
+                    if (existing_end_hour >= 24) existing_end_hour -= 24;
+                    if (new_end_hour >= 24) new_end_hour -= 24;
+                    
+                    if (!(new_end_hour <= existing_hour || existing_end_hour <= new_hour)) {
+                        course.close();
+                        return true; // Conflict detected
+                    }
+                }
+            }
+        }
+    }
+    course.close();
+    return false; // No conflict
+}
 
 //add course function
 void Add_course() {
@@ -903,20 +1362,31 @@ void Add_course() {
     auto screen = ScreenInteractive::TerminalOutput();
     string CourseID, CourseName, CourseRoom,CourseCredit, CourseDate, CourseTime;
     InputOption opt; 
-    auto CourseID_input = Input(&CourseID,"Course ID", opt);
-    auto CourseName_input = Input(&CourseName,"Course Name", opt);
-    auto CourseRoom_input = Input(&CourseRoom,"Course Room", opt);
-    auto CourseCredit_input = Input(&CourseCredit,"Course Credit", opt);
-    auto CourseDate_input = Input(&CourseDate,"Course Date", opt);
-    auto CourseTime_input = Input(&CourseTime,"Course Time", opt);
+    auto CourseID_input = Input(&CourseID,"(4 letters + 4 digits) e.g. MATH3301", opt);
+    auto CourseName_input = Input(&CourseName,"not longer than 40 e.g. Algebra I", opt);
+    auto CourseRoom_input = Input(&CourseRoom,"1 letter + 3 digits e.g. C213", opt);
+    auto CourseCredit_input = Input(&CourseCredit,"number of credits [3 / 6]", opt);
+    auto CourseDate_input = Input(&CourseDate,"Only one day for 3-credit courses", opt);
+    auto CourseTime_input = Input(&CourseTime,"Only one time for 3-credit courses [:00 or :30]", opt);
     string error_message;
     auto submit_button = Button("Submit", [&] {
         if (CourseID.empty() || CourseName.empty() || CourseRoom.empty() || CourseCredit.empty() || CourseDate.empty() || CourseTime.empty()) {
             error_message = "All fields are required.";
             return;
-        } 
+        }  else if (course_exists(CourseID)) {
+            error_message = "Course ID already exists.";
+            return;
+        }
+        if (clashtest(CourseID, CourseName, CourseRoom, CourseCredit, CourseDate, CourseTime)) {
+            clash_timetable(CourseID, CourseName, CourseRoom, CourseCredit, CourseDate, CourseTime);
+            return;
+        }
+        write_in_course(CourseID, CourseName, CourseRoom, CourseCredit, CourseDate, CourseTime);
         error_message = "Course added successfully! System will turn you back in 1 seconds.";
-        screen.ExitLoopClosure()();
+        std::thread([&screen] {
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+            screen.ExitLoopClosure()();
+        }).detach();
     });
     auto cancel_button = Button("Cancel", [&] {
         screen.ExitLoopClosure()();
@@ -964,7 +1434,345 @@ void Add_course() {
     });
     screen.Loop(event_handler);
     system("cls");
-    login();
+    manage_courses();
+}
+
+void Delete_course() {
+    system("cls");
+    auto screen = ScreenInteractive::TerminalOutput();
+    string ID;
+    InputOption opt;
+    auto ID_input = Input(&ID, "Enter course ID", opt);
+    string error_message;
+    bool found = false;
+    int tab_index = 0;
+    string found_name, found_room, found_credit, found_date, found_time; 
+    bool should_return = false;
+
+    auto submit_button = Button("Next", [&] {
+        if (ID.empty()) {
+            error_message = "Please enter course ID.";
+            return;
+        }
+
+        ifstream fin("course.txt");
+        string fileID, fileName, fileRoom, fileCredit, fileDate, fileTime;
+        found = false;
+        while (getline(fin, fileID)) {
+            if (fileID == ID) {
+                found = true;
+                getline(fin, found_name);
+                getline(fin, found_room);
+                getline(fin, found_credit);
+                getline(fin, found_date);
+                getline(fin, found_time);
+                string empty_line;
+                getline(fin, empty_line);
+                break;
+            }
+            for (int i = 0; i < 6; i++) {
+                string temp;
+                getline(fin, temp);
+            }
+        }
+        fin.close();
+        if (!found) {
+            error_message = "ID not found.";
+            return;
+        }
+        error_message = "Are you sure you want to delete this account?";
+        tab_index = 1;
+        screen.PostEvent(Event::Custom);
+    });
+
+    auto confirm_button = Button("Confirm", [&] {
+
+        vector<tuple<string, string, string, string, string, string>> records;
+        ifstream fin("course.txt");
+        string fileID, fileName, fileRoom, fileCredit, fileDate, fileTime;
+        while (getline(fin, fileID)) {
+            if (fileID != ID) {
+                getline(fin, fileName);
+                getline(fin, fileRoom);
+                getline(fin, fileCredit);
+                getline(fin, fileDate);
+                getline(fin, fileTime);
+                string empty_line;
+                getline(fin, empty_line); // Skip empty line
+                records.push_back({fileID, fileName, fileRoom, fileCredit, fileDate, fileTime});
+            } else {
+                for (int i = 0; i < 6; i++) {
+                    string temp;
+                    getline(fin, temp);
+                }
+            }
+        }
+        fin.close();
+        ofstream fout("course.txt");
+        for (auto& rec : records) {
+            fout << get<0>(rec) << endl;
+            fout << get<1>(rec) << endl;
+            fout << get<2>(rec) << endl;
+            fout << get<3>(rec) << endl;
+            fout << get<4>(rec) << endl;
+            fout << get<5>(rec) << endl;
+            fout << endl;
+        }
+        fout.close();
+        error_message = "Course deleted! Returning in 1 second.";
+        std::thread([&screen] {
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+            screen.ExitLoopClosure()();
+        }).detach();
+    });
+
+    auto cancel_button_1 = Button("Cancel", [&] {
+        should_return = true;
+        screen.ExitLoopClosure()();
+    });
+    auto cancel_button_2 = Button("Cancel", [&] {
+        should_return = true;
+        screen.ExitLoopClosure()();
+    });
+
+    auto id_container = Container::Vertical({
+        ID_input,
+        submit_button,
+        cancel_button_1
+    });
+
+    auto confirm_container = Container::Vertical({
+        confirm_button,
+        cancel_button_2
+    });
+
+    auto main_container = Container::Tab(
+        {id_container, confirm_container},
+        &tab_index
+    );
+
+    auto renderer = Renderer(main_container, [&] {
+        if (tab_index == 0) {
+            return vbox({
+                text("Delete Course - Enter ID") | bold | color(Color::Blue) | hcenter,
+                separator(),
+                hbox(text("ID:  "), ID_input->Render()) | hcenter,
+                hbox(submit_button->Render(), text(" "), cancel_button_1->Render()) | hcenter,
+                filler(),
+                text(error_message) | color(Color::Red) | hcenter,
+                text("Press esc to quit") | color(Color::GrayDark) | hcenter
+            }) | border;
+        } else {
+            return vbox({
+                text("Delete Course - Confirm") | bold | color(Color::Blue) | hcenter,
+                separator(),
+                text("Are you sure you want to delete this course?") | color(Color::Red) | hcenter,
+                hbox(text("ID: "), text(ID) | color(Color::Blue)) | hcenter,
+                hbox(text("Name: "), text(found_name) | color(Color::Blue)) | hcenter,
+                hbox(text("Room: "), text(found_room) | color(Color::Blue)) | hcenter,
+                hbox(text("Credit: "), text(found_credit) | color(Color::Blue)) | hcenter,
+                hbox(text("Date: "), text(found_date) | color(Color::Blue)) | hcenter,
+                hbox(text("Time: "), text(found_time) | color(Color::Blue)) | hcenter,
+                hbox(confirm_button->Render(), text(" "), cancel_button_2->Render()) | hcenter,
+                filler(),
+                text(error_message) | color(Color::Red) | hcenter,
+                text("Press esc to quit") | color(Color::GrayDark) | hcenter
+            }) | border;
+        }
+    });
+
+    auto event_handler = CatchEvent(renderer, [&](Event event) {
+        if (event == Event::Escape) {
+            should_return = true;
+            screen.ExitLoopClosure()();
+            return true;
+        }
+        return false;
+    });
+
+    screen.Loop(event_handler);
+    system("cls");
+    if (should_return) return;
+    menu_admin();
+}
+
+void Edit_course() {
+    system("cls");
+    auto screen = ScreenInteractive::TerminalOutput();
+    string ID;
+    InputOption opt;
+    auto ID_input = Input(&ID, "Enter course ID", opt);
+    string error_message;
+    bool found = false;
+    int tab_index = 0;
+    string found_name, found_room, found_credit, found_date, found_time; 
+    bool should_return = false;
+
+    auto submit_button = Button("Next", [&] {
+        if (ID.empty()) {
+            error_message = "Please enter course ID.";
+            return;
+        }
+
+        ifstream fin("course.txt");
+        string fileID, fileName, fileRoom, fileCredit, fileDate, fileTime;
+        found = false;
+        while (getline(fin, fileID)) {
+            if (fileID == ID) {
+                found = true;
+                getline(fin, found_name);
+                getline(fin, found_room);
+                getline(fin, found_credit);
+                getline(fin, found_date);
+                getline(fin, found_time);
+                string empty_line;
+                getline(fin, empty_line); // Skip empty line
+                break;
+            }
+            for (int i = 0; i < 6; i++) {
+                string temp;
+                getline(fin, temp);
+            }
+        }
+        fin.close();
+        if (!found) {
+            error_message = "Course ID not found.";
+            return;
+        }
+        tab_index = 1;
+        screen.PostEvent(Event::Custom);
+    });
+
+    string new_name = found_name, new_room = found_room, new_credit = found_credit, new_date = found_date, new_time = found_time;
+    auto name_input = Input(&new_name, "Course Name", opt);
+    auto room_input = Input(&new_room, "Course Room", opt);
+    auto credit_input = Input(&new_credit, "Course Credit", opt);
+    auto date_input = Input(&new_date, "Course Date", opt);
+    auto time_input = Input(&new_time, "Course Time", opt);
+
+    auto save_button = Button("Save", [&] {
+        if (new_name.empty() || new_room.empty() || new_credit.empty() || new_date.empty() || new_time.empty()) {
+            error_message = "All fields are required.";
+            return;
+        }
+
+        vector<tuple<string, string, string, string, string, string>> records;
+        ifstream fin("course.txt");
+        string fileID, fileName, fileRoom, fileCredit, fileDate, fileTime;
+        while (getline(fin, fileID)) {
+            if (fileID != ID) {
+                getline(fin, fileName);
+                getline(fin, fileRoom);
+                getline(fin, fileCredit);
+                getline(fin, fileDate);
+                getline(fin, fileTime);
+                string empty_line;
+                getline(fin, empty_line);
+                records.push_back({fileID, fileName, fileRoom, fileCredit, fileDate, fileTime});
+            } else {
+                for (int i = 0; i < 6; i++) {
+                    string temp;
+                    getline(fin, temp);
+                }
+            }
+        }
+        fin.close();
+
+        records.push_back({ID, new_name, new_room, new_credit, new_date, new_time});
+
+        ofstream fout("course.txt");
+        for (auto& rec : records) {
+            fout << get<0>(rec) << endl;
+            fout << get<1>(rec) << endl;
+            fout << get<2>(rec) << endl;
+            fout << get<3>(rec) << endl;
+            fout << get<4>(rec) << endl;
+            fout << get<5>(rec) << endl;
+            fout << endl;
+        }
+        fout.close();
+        error_message = "Course updated successfully! Returning in 1 second.";
+        std::thread([&screen] {
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+            screen.ExitLoopClosure()();
+        }).detach();
+    });
+
+    auto cancel_button_1 = Button("Cancel", [&] {
+        should_return = true;
+        screen.ExitLoopClosure()();
+    });
+    auto cancel_button_2 = Button("Cancel", [&] {
+        should_return = true;
+        screen.ExitLoopClosure()();
+    });
+
+    auto id_container = Container::Vertical({
+        ID_input,
+        submit_button,
+        cancel_button_1
+    });
+
+    auto edit_container = Container::Vertical({
+        name_input,
+        room_input,
+        credit_input,
+        date_input,
+        time_input,
+        Container::Horizontal({
+            save_button,
+            cancel_button_2
+        })
+    });
+
+    auto main_container = Container::Tab(
+        {id_container, edit_container},
+        &tab_index
+    );
+
+    auto renderer = Renderer(main_container, [&] {
+        if (tab_index == 0) {
+            return vbox({
+                text("Edit Course - Enter ID") | bold | color(Color::Blue) | hcenter,
+                separator(),
+                hbox(text("ID:  "), ID_input->Render()) | hcenter,
+                hbox(submit_button->Render(), text(" "), cancel_button_1->Render()) | hcenter,
+                filler(),
+                text(error_message) | color(Color::Red) | hcenter,
+                text("Press esc to quit") | color(Color::GrayDark) | hcenter
+            }) | border;
+        } else {
+            return vbox({
+                text("Edit Course - Modify Information") | bold | color(Color::Blue) | hcenter,
+                separator(),
+                hbox(text("Course ID: "), text(ID) | color(Color::Blue)) | hcenter,
+                hbox(text("Name: "), name_input->Render()) | hcenter,
+                hbox(text("Room: "), room_input->Render()) | hcenter,
+                hbox(text("Credit: "), credit_input->Render()) | hcenter,
+                hbox(text("Date: "), date_input->Render()) | hcenter,
+                hbox(text("Time: "), time_input->Render()) | hcenter,
+                separator(),
+                hbox(save_button->Render(), text(" "), cancel_button_2->Render()) | hcenter,
+                filler(),
+                text(error_message) | color(Color::Red) | hcenter,
+                text("Press esc to quit") | color(Color::GrayDark) | hcenter
+            }) | border;
+        }
+    });
+
+    auto event_handler = CatchEvent(renderer, [&](Event event) {
+        if (event == Event::Escape) {
+            should_return = true;
+            screen.ExitLoopClosure()();
+            return true;
+        }
+        return false;
+    });
+
+    screen.Loop(event_handler);
+    system("cls");
+    if (should_return) return;
+    menu_admin();
 }
 
 //admin's manage student records function
@@ -1241,8 +2049,8 @@ void Delete_account() {
     auto ID_input = Input(&ID, "Enter student ID", opt);
     string error_message;
     bool found = false;
-    int tab_index = 0; // 0: input ID, 1: confirm
-    string found_name; // Save the found name
+    int tab_index = 0;
+    string found_name; 
     bool should_return = false;
 
     auto submit_button = Button("Next", [&] {
@@ -1250,7 +2058,7 @@ void Delete_account() {
             error_message = "Please enter ID.";
             return;
         }
-        // Check if ID exists
+
         ifstream fin("student.txt");
         string fileID, filePassword, fileName;
         found = false;
@@ -1272,7 +2080,7 @@ void Delete_account() {
     });
 
     auto confirm_button = Button("Confirm", [&] {
-        // Delete the account
+
         vector<tuple<string, string, string>> records;
         ifstream fin("student.txt");
         string fileID, filePassword, fileName;
@@ -1359,5 +2167,5 @@ void Delete_account() {
 
 //main function
 int main () {
-    startup_animation();
+    login();
 }
