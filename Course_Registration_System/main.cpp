@@ -1465,11 +1465,11 @@ void timetable() {
       return true;
     }
     if (event == Event::ArrowLeft) {
-      current_floor = (current_floor + 1) % 5;  // Wrap around
+      current_floor = (current_floor + 1) % 4;  // Wrap around
       return true;
     }
     if (event == Event::ArrowRight) {
-      current_floor = (current_floor + 1) % 5;  // Wrap around
+      current_floor = (current_floor + 1) % 4;  // Wrap around
       return true;
     }
     if (event == Event::ArrowUp) {
