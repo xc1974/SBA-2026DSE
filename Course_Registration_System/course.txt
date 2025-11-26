@@ -1,0 +1,69 @@
+MATH1011
+University_Mathematics_I
+M101
+6
+MON WED
+09:00-12:00
+
+MATH2101
+Linear_Algebra_I
+M201
+6
+TUE THU
+10:00-13:00
+
+MATH2211
+Multivariable_Calculus
+M201
+6
+MON THU
+10:00-11:00
+
+MATH2241
+Introduction_to_Mathematical_Analysis
+M201
+6
+WED FRI
+09:00-12:00
+
+MATH3304
+Introduction_to_Number_Theory
+M204
+6
+TUE FRI
+13:00-16:00
+
+MATH3301
+Algebra_I
+M202
+6
+TUE THU
+10:00-13:00
+
+MATH3401
+Analysis_I
+M203
+6
+WED FRI
+09:00-12:00
+
+COMP1117
+Computer_Programming
+C101
+6
+TUE FRI
+14:00-17:00
+
+COMP2113
+Programming_Technologies
+C207
+6
+WED FRI
+16:00-19:00
+
+COMP2121
+Discrete_Mathematics
+C205
+6
+TUE WED
+13:00-17:00
