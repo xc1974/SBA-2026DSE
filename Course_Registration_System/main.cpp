@@ -1465,11 +1465,11 @@ void timetable() {
       return true;
     }
     if (event == Event::ArrowLeft) {
-      current_floor = (current_floor + 1) % 4;  // Wrap around
+      current_floor = (current_floor + 1) % 4;  // Wrap around 我是傻子 mod5
       return true;
     }
     if (event == Event::ArrowRight) {
-      current_floor = (current_floor + 1) % 4;  // Wrap around
+      current_floor = (current_floor + 1) % 4;  // Wrap around 我是傻子 mod5
       return true;
     }
     if (event == Event::ArrowUp) {
@@ -2495,7 +2495,7 @@ void Add_course() {
     }
     if (clashtest(CourseID, CourseName, CourseRoom, CourseCredit, CourseDate,
                   CourseTime)) {
-      clash_timetable(CourseID, CourseName, CourseRoom, CourseCredit,
+      clash_(CourseID, CourseName, CourseRoom, CourseCredit,
                       CourseDate, CourseTime);
       return;
     }
@@ -2643,7 +2643,7 @@ void Edit_course() {
         edit_fail_count = 0;
         return;
       } else {
-        clash_timetable(CourseID, newName, newRoom, newCredit, newDate, newTime);
+        clash_(CourseID, newName, newRoom, newCredit, newDate, newTime);
         return;
       }
     }
