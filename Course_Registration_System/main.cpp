@@ -56,6 +56,8 @@ void menu_student();
 void course_history();
 void timetable();
 void course_registration();
+void course_search_and_add();
+void course_drop();
 void change_password();
 void logout();
 void menu_admin();
@@ -125,8 +127,126 @@ std::vector<Course> load_all_courses() {
   return courses;
 }
 
+// 檢查學生是否已註冊課程
+bool is_student_registered(const string& studentID, const string& courseID) {
+  ifstream fin("registrations.txt");
+  if (!fin) return false;
+  
+  string sID, cID;
+  while (fin >> sID >> cID) {
+    if (sID == studentID && cID == courseID) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// 添加學生課程註冊
+bool add_student_registration(const string& studentID, const string& courseID) {
+  if (is_student_registered(studentID, courseID)) {
+    return false; // 已經註冊過
+  }
+  
+  ofstream fout("registrations.txt", ios::app);
+  if (!fout) return false;
+  
+  fout << studentID << " " << courseID << endl;
+  return true;
+}
+
+// 移除學生課程註冊
+bool remove_student_registration(const string& studentID, const string& courseID) {
+  ifstream fin("registrations.txt");
+  if (!fin) return false;
+  
+  vector<pair<string, string>> registrations;
+  string sID, cID;
+  bool found = false;
+  
+  while (fin >> sID >> cID) {
+    if (sID == studentID && cID == courseID) {
+      found = true; // 跳過這一行，不添加到vector中
+    } else {
+      registrations.push_back({sID, cID});
+    }
+  }
+  fin.close();
+  
+  if (!found) return false;
+  
+  ofstream fout("registrations.txt");
+  if (!fout) return false;
+  
+  for (const auto& reg : registrations) {
+    fout << reg.first << " " << reg.second << endl;
+  }
+  return true;
+}
+
+// 前置宣告
+bool clashtest(string CourseID, string CourseName, string CourseRoom, 
+               string CourseCredit, string CourseDate, string CourseTime);
+
+
 // 前置宣告：get_student_courses 定義在檔案之後，但在多處使用需先宣告
 std::vector<std::string> get_student_courses(std::string studentID);
+
+// 實際定義
+vector<string> get_student_courses(string studentID) {
+  vector<string> registered_courses;
+
+  ifstream fin("registrations.txt");
+  if (!fin)
+    return registered_courses;
+
+  string sID, cID;
+  while (fin >> sID >> cID) {
+    if (sID == studentID) {  // 修復：使用參數而不是全局變量
+      registered_courses.push_back(cID);
+    }
+  }
+  return registered_courses;
+}
+
+// 獲取學生已註冊課程數量
+int get_student_course_count(const string& studentID) {
+  return static_cast<int>(get_student_courses(studentID).size());
+}
+
+// 檢查課程時間衝突（針對學生）
+bool check_student_course_clash(const string& studentID, const string& newCourseID) {
+  vector<string> studentCourses = get_student_courses(studentID);
+  vector<Course> allCourses = load_all_courses();
+  
+  // 找到新課程的信息
+  Course newCourse;
+  bool foundNewCourse = false;
+  for (const auto& course : allCourses) {
+    if (course.id == newCourseID) {
+      newCourse = course;
+      foundNewCourse = true;
+      break;
+    }
+  }
+  
+  if (!foundNewCourse) return false;
+  
+  // 檢查與已註冊課程的衝突
+  for (const string& registeredCourseID : studentCourses) {
+    for (const auto& course : allCourses) {
+      if (course.id == registeredCourseID) {
+        // 使用現有的衝突檢測函數
+        if (clashtest(newCourse.id, newCourse.name, newCourse.room, 
+                     newCourse.credit, newCourse.date, newCourse.time)) {
+          return true; // 有衝突
+        }
+      }
+    }
+  }
+  
+  return false; // 沒有衝突
+}
+
 // Normalize time string to HH:MM (e.g., "8:00" -> "08:00")
 string normalize_time(const string& t) {
   int h = 0, m = 0;
@@ -153,6 +273,32 @@ string normalize_time(const string& t) {
   char buf[6];
   snprintf(buf, sizeof(buf), "%02d:%02d", h, m);
   return string(buf);
+}
+
+// 解析時間範圍 (e.g., "09:00-12:00" -> {"09:00", "12:00"})
+pair<string, string> parse_time_range(const string& time_str) {
+  size_t dash_pos = time_str.find('-');
+  if (dash_pos != string::npos) {
+    string start_time = time_str.substr(0, dash_pos);
+    string end_time = time_str.substr(dash_pos + 1);
+    return {normalize_time(start_time), normalize_time(end_time)};
+  } else {
+    // 如果沒有範圍，假設是2小時課程
+    string start = normalize_time(time_str);
+    int h = stoi(start.substr(0, 2));
+    int m = stoi(start.substr(3, 2));
+    h += 2;
+    if (h >= 24) h -= 24;
+    char buf[6];
+    snprintf(buf, sizeof(buf), "%02d:%02d", h, m);
+    return {start, string(buf)};
+  }
+}
+
+// 檢查兩個時間範圍是否重疊
+bool time_ranges_overlap(const string& start1, const string& end1, 
+                        const string& start2, const string& end2) {
+  return !(end1 <= start2 || end2 <= start1);
 }
 
 // name modify function (to avoid the seperation between first name and last
@@ -591,23 +737,140 @@ void menu_admin() {
 void course_history() {
   system("cls");
   auto screen = ScreenInteractive::TerminalOutput();
-  bool should_quit = false;
-
-  auto title = text("Course History") | bold | color(Color::Blue);
-
-  auto container = Container::Vertical({});
-
-  auto renderer = Renderer(container, [&] {
-    return vbox({
-               title | hcenter,
-               separator(),
-               text("No course history available.") | hcenter,
-               filler(),
-               text("Press esc to return") | color(Color::GrayDark) | hcenter,
-           }) |
-           border;
+  
+  vector<string> student_course_ids = get_student_courses(ID);
+  vector<Course> all_courses = load_all_courses();
+  vector<Course> student_courses;
+  
+  // 獲取學生已註冊課程的詳細信息
+  for (const string& course_id : student_course_ids) {
+    for (const auto& course : all_courses) {
+      if (course.id == course_id) {
+        student_courses.push_back(course);
+        break;
+      }
+    }
+  }
+  
+  if (student_courses.empty()) {
+    auto back_button = Button("Back", [&] { screen.ExitLoopClosure()(); });
+    auto renderer = Renderer(back_button, [&] {
+      return vbox({
+                 text("My Course History") | bold | color(Color::Blue) | hcenter,
+                 separator(),
+                 text("You are not registered for any courses.") | color(Color::Red) | hcenter,
+                 separator(),
+                 back_button->Render() | hcenter,
+                 text("Press ESC to return") | color(Color::GrayDark) | hcenter,
+             }) | border;
+    });
+    
+    auto event_handler = CatchEvent(renderer, [&](Event event) {
+      if (event == Event::Escape) {
+        screen.ExitLoopClosure()();
+        return true;
+      }
+      return false;
+    });
+    
+    screen.Loop(event_handler);
+    system("cls");
+    menu_student();
+    return;
+  }
+  
+  int selected_course = 0;
+  string error_message;
+  
+  vector<string> course_entries;
+  for (const auto& course : student_courses) {
+    string display_name = course.name;
+    for (auto& ch : display_name) if (ch == '_') ch = ' ';
+    
+    string entry = course.id + " | " + display_name + " | " + 
+                  course.room + " | " + course.credit + " credits | " +
+                  course.date + " | " + course.time;
+    course_entries.push_back(entry);
+  }
+  
+  MenuOption menu_option;
+  menu_option.on_enter = [&] {
+    // 當用戶選擇課程時不做任何事，等待點擊按鈕
+  };
+  auto course_menu = Menu(&course_entries, &selected_course, menu_option);
+  
+  auto drop_button = Button("Drop Selected Course", [&] {
+    if (selected_course >= 0 && selected_course < static_cast<int>(student_courses.size())) {
+      Course selected = student_courses[selected_course];
+      
+      if (remove_student_registration(ID, selected.id)) {
+        error_message = "Course " + selected.id + " dropped successfully!";
+        
+        // 更新課程列表
+        student_course_ids = get_student_courses(ID);
+        student_courses.clear();
+        for (const string& course_id : student_course_ids) {
+          for (const auto& course : all_courses) {
+            if (course.id == course_id) {
+              student_courses.push_back(course);
+              break;
+            }
+          }
+        }
+        
+        // 更新顯示條目
+        course_entries.clear();
+        for (const auto& course : student_courses) {
+          string display_name = course.name;
+          for (auto& ch : display_name) if (ch == '_') ch = ' ';
+          
+          string entry = course.id + " | " + display_name + " | " + 
+                        course.room + " | " + course.credit + " credits | " +
+                        course.date + " | " + course.time;
+          course_entries.push_back(entry);
+        }
+        
+        if (selected_course >= static_cast<int>(course_entries.size()) && !course_entries.empty()) {
+          selected_course = static_cast<int>(course_entries.size()) - 1;
+        }
+      } else {
+        error_message = "Failed to drop course. Please try again.";
+      }
+    }
   });
-
+  
+  auto back_button = Button("Back", [&] { screen.ExitLoopClosure()(); });
+  
+  auto button_container = Container::Horizontal({drop_button, back_button});
+  auto main_container = Container::Vertical({course_menu, button_container});
+  
+  auto renderer = Renderer(main_container, [&] {
+    Elements content;
+    content.push_back(text("My Course History") | bold | color(Color::Blue) | hcenter);
+    content.push_back(separator());
+    
+    if (student_courses.empty()) {
+      content.push_back(text("No registered courses.") | color(Color::Red) | hcenter);
+      content.push_back(separator());
+      content.push_back(back_button->Render() | hcenter);
+    } else {
+      content.push_back(text("Your Registered Courses (" + to_string(student_courses.size()) + "/5):") | 
+                       bold | color(Color::Green) | hcenter);
+      content.push_back(course_menu->Render());
+      content.push_back(separator());
+      content.push_back(hbox({drop_button->Render(), text(" "), 
+                             back_button->Render()}) | hcenter);
+    }
+    
+    content.push_back(separator());
+    content.push_back(text(error_message) | 
+                     color(error_message.find("successfully") != string::npos ? 
+                           Color::Green : Color::Red) | hcenter);
+    content.push_back(text("Press ESC to return") | color(Color::GrayDark) | hcenter);
+    
+    return vbox(content) | border;
+  });
+  
   auto event_handler = CatchEvent(renderer, [&](Event event) {
     if (event == Event::Escape) {
       screen.ExitLoopClosure()();
@@ -615,7 +878,7 @@ void course_history() {
     }
     return false;
   });
-
+  
   screen.Loop(event_handler);
   system("cls");
   menu_student();
@@ -1033,26 +1296,22 @@ void timetable() {
   fin.close();
 
   vector<string> time_slots = {
-      "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
-      "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30",
-      "16:00", "16:30", "17:00", "17:30", "18:00", "18:30"};
+      "09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "12:00", "12:30",
+      "13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30",
+      "17:00", "17:30", "18:00"};
 
-  vector<string> g_rooms = {"G001", "G002", "G003", "G004", "G005",
-                            "G006", "G007", "G008", "G009", "G010"};
-  vector<string> floor1_rooms = {"1001", "1002", "1003", "1004", "1005",
-                                 "1006", "1007", "1008", "1009", "1010"};
-  vector<string> floor2_rooms = {"2001", "2002", "2003", "2004", "2005",
-                                 "2006", "2007", "2008", "2009", "2010"};
-  vector<string> floor3_rooms = {"3001", "3002", "3003", "3004", "3005",
-                                 "3006", "3007", "3008", "3009", "3010"};
-  vector<string> floor4_rooms = {"4001", "4002", "4003", "4004", "4005",
-                                 "4006", "4007", "4008", "4009", "4010"};
+  vector<string> m1_rooms = {"M101", "M102", "M103", "M104", "M105",
+                            "M106", "M107", "M108", "M109", "M110"};
+  vector<string> m2_rooms = {"M201", "M202", "M203", "M204", "M205",
+                            "M206", "M207", "M208", "M209", "M210"};
+  vector<string> c1_rooms = {"C101", "C102", "C103", "C104", "C105",
+                                 "C106", "C107", "C108", "C109", "C110"};
+  vector<string> c2_rooms = {"C201", "C202", "C203", "C204", "C205",
+                                 "C206", "C207", "C208", "C209", "C210"};
 
-  int current_floor = 0;  // 0=G, 1=1st, 2=2nd, 3=3rd, 4=4th
-  vector<string> floor_names = {"G FLOOR", "1ST FLOOR", "2ND FLOOR",
-                                "3RD FLOOR", "4TH FLOOR"};
-  vector<vector<string>> all_rooms = {g_rooms, floor1_rooms, floor2_rooms,
-                                      floor3_rooms, floor4_rooms};
+  int current_floor = 0;  // 0=M1, 1=M2, 2=C1, 3=C2
+  vector<string> floor_names = {"M1 FLOOR", "M2 FLOOR", "C1 FLOOR", "C2 FLOOR"};
+  vector<vector<string>> all_rooms = {m1_rooms, m2_rooms, c1_rooms, c2_rooms};
 
   int current_day = 0;  // 0=MON, 1=TUE, 2=WED, 3=THU, 4=FRI
   vector<string> day_names = {"MON", "TUE", "WED", "THU", "FRI"};
@@ -1137,22 +1396,9 @@ void timetable() {
               }
 
               if (day_match) {
-                string course_start_time = normalize_time(course_time);
-                string course_end_time = "";
-
-                int start_hour = stoi(course_start_time.substr(0, 2));
-                int start_minute = stoi(course_start_time.substr(3, 2));
-
-                int end_hour = start_hour + 2;
-                int end_minute = start_minute;
-
-                if (end_hour >= 24) {
-                  end_hour -= 24;
-                }
-
-                char end_time_str[6];
-                snprintf(end_time_str, sizeof(end_time_str), "%02d:%02d", end_hour, end_minute);
-                course_end_time = string(end_time_str);
+                auto time_range = parse_time_range(course_time);
+                string course_start_time = time_range.first;
+                string course_end_time = time_range.second;
 
                 if (time >= course_start_time && time < course_end_time) {
                   is_occupied = true;
@@ -1219,7 +1465,7 @@ void timetable() {
       return true;
     }
     if (event == Event::ArrowLeft) {
-      current_floor = (current_floor - 1 + 5) % 5;  // Wrap around
+      current_floor = (current_floor + 1) % 5;  // Wrap around
       return true;
     }
     if (event == Event::ArrowRight) {
@@ -1351,65 +1597,195 @@ void search_course(string find) {
   system("cls");
 }
 
-// student's course registration function
-void course_registration() {
+// 課程搜索和添加功能
+void course_search_and_add() {
   system("cls");
   auto screen = ScreenInteractive::TerminalOutput();
-
-  // State
+  
   string query;
   string error_message;
-
-  // Components
+  vector<Course> search_results;
+  bool show_results = false;
+  int selected_course = 0;
+  
   InputOption opt;
-  auto query_input = Input(&query, "Enter course ID or keyword", opt);
+  auto query_input = Input(&query, "Enter course ID prefix (e.g., MATH)", opt);
+  
   auto search_button = Button("Search", [&] {
     if (query.empty()) {
       error_message = "Please enter a search term.";
-      screen.PostEvent(Event::Custom);  // force re-render
       return;
     }
-    // Close this screen and call the existing search function (do not edit it)
-    screen.ExitLoopClosure()();
-    search_course(query);
+    
+    // 搜索課程
+    vector<Course> all_courses = load_all_courses();
+    search_results.clear();
+    
+    string query_upper = query;
+    transform(query_upper.begin(), query_upper.end(), query_upper.begin(), ::toupper);
+    
+    for (const auto& course : all_courses) {
+      string course_id_upper = course.id;
+      transform(course_id_upper.begin(), course_id_upper.end(), course_id_upper.begin(), ::toupper);
+      
+      if (course_id_upper.find(query_upper) == 0) { // 前綴匹配
+        search_results.push_back(course);
+      }
+    }
+    
+    if (search_results.empty()) {
+      error_message = "No courses found with prefix: " + query;
+      show_results = false;
+    } else {
+      error_message = "Found " + to_string(search_results.size()) + " courses. Select one to add:";
+      show_results = true;
+      selected_course = 0;
+    }
   });
+  
+  auto add_button = Button("Add Selected Course", [&] {
+    if (!show_results || search_results.empty()) {
+      error_message = "No course selected.";
+      return;
+    }
+    
+    Course selected = search_results[selected_course];
+    
+    // 檢查是否已經註冊
+    if (is_student_registered(ID, selected.id)) {
+      error_message = "You are already registered for this course!";
+      return;
+    }
+    
+    // 檢查課程數量限制
+    if (get_student_course_count(ID) >= 5) {
+      error_message = "You cannot register for more than 5 courses!";
+      return;
+    }
+    
+    // 檢查時間衝突
+    if (check_student_course_clash(ID, selected.id)) {
+      error_message = "Time clash detected with your existing courses!";
+      return;
+    }
+    
+    // 添加課程
+    if (add_student_registration(ID, selected.id)) {
+      error_message = "Course " + selected.id + " added successfully!";
+      show_results = false;
+      search_results.clear();
+    } else {
+      error_message = "Failed to add course. Please try again.";
+    }
+  });
+  
   auto back_button = Button("Back", [&] { screen.ExitLoopClosure()(); });
-
-  auto button_container = Container::Horizontal({search_button, back_button});
-  auto main_container = Container::Vertical({query_input, button_container});
-
-  auto title = text("Course Registration") | bold | color(Color::Blue);
-
+  
+  vector<string> course_entries;
+  MenuOption menu_option;
+  menu_option.on_enter = [&] {
+    // 選擇課程時不做任何事，等待用戶點擊添加按鈕
+  };
+  auto course_menu = Menu(&course_entries, &selected_course, menu_option);
+  
+  auto button_container = Container::Horizontal({search_button, add_button, back_button});
+  auto main_container = Container::Vertical({query_input, button_container, course_menu});
+  
   auto renderer = Renderer(main_container, [&] {
-    return vbox({
-               title | hcenter,
-               separator(),
-               hbox(text("Search: "), query_input->Render()) | hcenter,
-               separator(),
-               hbox({search_button->Render(), text(" "),
-                     back_button->Render()}) |
-                   hcenter,
-               filler(),
-               text(error_message) | color(Color::Red) | hcenter,
-               text("Press Enter to search, ESC to return") |
-                   color(Color::GrayDark) | hcenter,
-           }) |
-           border;
+    Elements content;
+    content.push_back(text("Add Course") | bold | color(Color::Blue) | hcenter);
+    content.push_back(separator());
+    content.push_back(hbox(text("Search: "), query_input->Render()) | hcenter);
+    content.push_back(separator());
+    content.push_back(hbox({search_button->Render(), text(" "), 
+                           add_button->Render(), text(" "), 
+                           back_button->Render()}) | hcenter);
+    
+    if (show_results && !search_results.empty()) {
+      content.push_back(separator());
+      content.push_back(text("Search Results:") | bold | color(Color::Green) | hcenter);
+      
+      // 更新課程條目
+      course_entries.clear();
+      for (const auto& course : search_results) {
+        string display_name = course.name;
+        for (auto& ch : display_name) if (ch == '_') ch = ' ';
+        
+        string entry = course.id + " | " + display_name + " | " + 
+                      course.room + " | " + course.credit + " credits | " +
+                      course.date + " | " + course.time;
+        course_entries.push_back(entry);
+      }
+      
+      content.push_back(course_menu->Render());
+    }
+    
+    content.push_back(separator());
+    content.push_back(text(error_message) | 
+                     color(error_message.find("successfully") != string::npos ? 
+                           Color::Green : Color::Red) | hcenter);
+    content.push_back(text("Press ESC to return") | color(Color::GrayDark) | hcenter);
+    
+    return vbox(content) | border;
   });
-
+  
   auto event_handler = CatchEvent(renderer, [&](Event event) {
     if (event == Event::Escape) {
       screen.ExitLoopClosure()();
       return true;
     }
+    return false;
+  });
+  
+  screen.Loop(event_handler);
+  system("cls");
+  course_registration();
+}
+
+// 課程註冊主選單
+void course_registration() {
+  system("cls");
+  auto screen = ScreenInteractive::TerminalOutput();
+  bool should_quit = false;
+  bool next_page = false;
+  int next_page_index = -1;
+
+  auto title = text("Course Registration") | bold | color(Color::Blue);
+
+  vector<string> menu_entries = {"Add Course", "Drop Course", "Back"};
+
+  int selected = 0;
+  MenuOption menu_option;
+  menu_option.on_enter = [&] {
+    next_page = true;
+    next_page_index = selected;
+    screen.ExitLoopClosure()();
+  };
+  auto menu = Menu(&menu_entries, &selected, menu_option);
+
+  auto main_container = Container::Vertical({menu});
+
+  auto renderer = Renderer(main_container, [&] {
+    return vbox({
+               title | hcenter,
+               separator(),
+               menu->Render(),
+               filler(),
+               text("Press esc to quit") | color(Color::GrayDark) | hcenter,
+           }) |
+           border;
+  });
+
+  auto event_handler = CatchEvent(renderer, [&](Event event) {
     if (event == Event::Return) {
-      if (query.empty()) {
-        error_message = "Please enter a search term.";
-        screen.PostEvent(Event::Custom);
-        return true;
-      }
+      next_page = true;
+      next_page_index = selected;
       screen.ExitLoopClosure()();
-      search_course(query);
+      return true;
+    }
+    if (event == Event::Escape) {
+      should_quit = true;
+      screen.ExitLoopClosure()();
       return true;
     }
     return false;
@@ -1417,8 +1793,171 @@ void course_registration() {
 
   screen.Loop(event_handler);
 
+  if (next_page) {
+    system("cls");
+    switch (next_page_index) {
+      case 0:
+        course_search_and_add();
+        break;
+      case 1:
+        course_drop();
+        break;
+      case 2:
+        menu_student();
+        return;
+    }
+  } else if (should_quit) {
+    system("cls");
+    menu_student();
+  }
+}
+
+// 課程刪除功能
+void course_drop() {
   system("cls");
-  menu_student();
+  auto screen = ScreenInteractive::TerminalOutput();
+  
+  vector<string> student_course_ids = get_student_courses(ID);
+  vector<Course> all_courses = load_all_courses();
+  vector<Course> student_courses;
+  
+  // 獲取學生已註冊課程的詳細信息
+  for (const string& course_id : student_course_ids) {
+    for (const auto& course : all_courses) {
+      if (course.id == course_id) {
+        student_courses.push_back(course);
+        break;
+      }
+    }
+  }
+  
+  if (student_courses.empty()) {
+    auto ok_button = Button("OK", [&] { screen.ExitLoopClosure()(); });
+    auto renderer = Renderer(ok_button, [&] {
+      return vbox({
+                 text("Drop Course") | bold | color(Color::Blue) | hcenter,
+                 separator(),
+                 text("You are not registered for any courses.") | color(Color::Red) | hcenter,
+                 separator(),
+                 ok_button->Render() | hcenter,
+                 text("Press ESC to return") | color(Color::GrayDark) | hcenter,
+             }) | border;
+    });
+    
+    auto event_handler = CatchEvent(renderer, [&](Event event) {
+      if (event == Event::Escape) {
+        screen.ExitLoopClosure()();
+        return true;
+      }
+      return false;
+    });
+    
+    screen.Loop(event_handler);
+    system("cls");
+    course_registration();
+    return;
+  }
+  
+  int selected_course = 0;
+  string error_message;
+  
+  vector<string> course_entries;
+  for (const auto& course : student_courses) {
+    string display_name = course.name;
+    for (auto& ch : display_name) if (ch == '_') ch = ' ';
+    
+    string entry = course.id + " | " + display_name + " | " + 
+                  course.room + " | " + course.credit + " credits | " +
+                  course.date + " | " + course.time;
+    course_entries.push_back(entry);
+  }
+  
+  MenuOption menu_option;
+  menu_option.on_enter = [&] {
+    // 當用戶選擇課程時不做任何事，等待點擊刪除按鈕
+  };
+  auto course_menu = Menu(&course_entries, &selected_course, menu_option);
+  
+  auto drop_button = Button("Drop Selected Course", [&] {
+    if (selected_course >= 0 && selected_course < static_cast<int>(student_courses.size())) {
+      Course selected = student_courses[selected_course];
+      
+      if (remove_student_registration(ID, selected.id)) {
+        error_message = "Course " + selected.id + " dropped successfully!";
+        
+        // 更新課程列表
+        student_course_ids = get_student_courses(ID);
+        student_courses.clear();
+        for (const string& course_id : student_course_ids) {
+          for (const auto& course : all_courses) {
+            if (course.id == course_id) {
+              student_courses.push_back(course);
+              break;
+            }
+          }
+        }
+        
+        // 更新顯示條目
+        course_entries.clear();
+        for (const auto& course : student_courses) {
+          string display_name = course.name;
+          for (auto& ch : display_name) if (ch == '_') ch = ' ';
+          
+          string entry = course.id + " | " + display_name + " | " + 
+                        course.room + " | " + course.credit + " credits | " +
+                        course.date + " | " + course.time;
+          course_entries.push_back(entry);
+        }
+        
+        if (selected_course >= static_cast<int>(course_entries.size()) && !course_entries.empty()) {
+          selected_course = static_cast<int>(course_entries.size()) - 1;
+        }
+      } else {
+        error_message = "Failed to drop course. Please try again.";
+      }
+    }
+  });
+  
+  auto back_button = Button("Back", [&] { screen.ExitLoopClosure()(); });
+  
+  auto button_container = Container::Horizontal({drop_button, back_button});
+  auto main_container = Container::Vertical({course_menu, button_container});
+  
+  auto renderer = Renderer(main_container, [&] {
+    Elements content;
+    content.push_back(text("Drop Course") | bold | color(Color::Blue) | hcenter);
+    content.push_back(separator());
+    
+    if (student_courses.empty()) {
+      content.push_back(text("No courses to drop.") | color(Color::Red) | hcenter);
+    } else {
+      content.push_back(text("Your Registered Courses:") | bold | color(Color::Green) | hcenter);
+      content.push_back(course_menu->Render());
+    }
+    
+    content.push_back(separator());
+    content.push_back(hbox({drop_button->Render(), text(" "), 
+                           back_button->Render()}) | hcenter);
+    content.push_back(separator());
+    content.push_back(text(error_message) | 
+                     color(error_message.find("successfully") != string::npos ? 
+                           Color::Green : Color::Red) | hcenter);
+    content.push_back(text("Press ESC to return") | color(Color::GrayDark) | hcenter);
+    
+    return vbox(content) | border;
+  });
+  
+  auto event_handler = CatchEvent(renderer, [&](Event event) {
+    if (event == Event::Escape) {
+      screen.ExitLoopClosure()();
+      return true;
+    }
+    return false;
+  });
+  
+  screen.Loop(event_handler);
+  system("cls");
+  course_registration();
 }
 
 bool course_exists(string CourseID) {
@@ -1708,24 +2247,11 @@ bool clashtest(string CourseID,
         }
 
         if (day_overlap) {
-          string existing_start = normalize_time(courseTime);
-          string new_start = normalize_time(CourseTime);
+          auto existing_time_range = parse_time_range(courseTime);
+          auto new_time_range = parse_time_range(CourseTime);
 
-          int existing_hour = stoi(existing_start.substr(0, 2));
-          int existing_minute = stoi(existing_start.substr(3, 2));
-          int new_hour = stoi(new_start.substr(0, 2));
-          int new_minute = stoi(new_start.substr(3, 2));
-
-          int existing_end_hour = existing_hour + 2;
-          int new_end_hour = new_hour + 2;
-
-          if (existing_end_hour >= 24)
-            existing_end_hour -= 24;
-          if (new_end_hour >= 24)
-            new_end_hour -= 24;
-
-          if (!(new_end_hour <= existing_hour ||
-                existing_end_hour <= new_hour)) {
+          if (time_ranges_overlap(existing_time_range.first, existing_time_range.second,
+                                 new_time_range.first, new_time_range.second)) {
             course.close();
             return true;  // Conflict detected
           }
@@ -2889,21 +3415,6 @@ void Delete_account() {
 // ID = "yys";  // This line causes error, commented out
 // end
 
-vector<string> get_student_courses(string studentID) {
-  vector<string> registered_courses;
-
-  ifstream fin("registrations.txt");
-  if (!fin)
-    return registered_courses;
-
-  string sID, cID;
-  while (fin >> sID >> cID) {
-    if (sID == ID) {
-      registered_courses.push_back(cID);
-    }
-  }
-  return registered_courses;
-}
 
 void timetable_student(string ID) {
   system("cls");
